@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+acrac.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+app.db
+
+# Logs
+logs/
+*.log
+uvicorn.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Frontend build
+frontend/dist/
+frontend/build/
+frontend/.next/
+
+# Docker
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+backup/
+*.bak
+*.backup
+
+# Evaluation results
+evaluation_results_*.json
+trace_*.json
+official_ragas_evaluation_report_*.json
+official_ragas_evaluation_report_*.csv
+
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+
+# RAGAS specific
+RAGAS/
+
+# Archive
+archive/

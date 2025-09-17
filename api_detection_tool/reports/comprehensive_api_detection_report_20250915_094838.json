@@ -1,0 +1,3338 @@
+{
+  "generated_at": "2025-09-15T09:48:38.115042",
+  "project_root": "/Users/charlieliu/git_project_vscode/09_medical/ACRAC-web",
+  "summary": {
+    "total_endpoints": 21,
+    "used_endpoints": 1,
+    "unused_endpoints": 20,
+    "usage_rate": 0.047619047619047616,
+    "total_usage": 121,
+    "frontend_usage": 70,
+    "backend_usage": 51,
+    "method_distribution": {
+      "GET": 14,
+      "POST": 7
+    },
+    "tag_distribution": {},
+    "average_usage_per_endpoint": 5.761904761904762
+  },
+  "defined_endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "function_name": "health_check",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 16,
+      "tags": [],
+      "summary": "",
+      "description": "系统健康检查",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/health')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/statistics",
+      "function_name": "get_statistics",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 49,
+      "tags": [],
+      "summary": "",
+      "description": "获取详细统计信息",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/statistics')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/panels",
+      "function_name": "list_panels",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 83,
+      "tags": [],
+      "summary": "",
+      "description": "列出所有Panels",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/panels')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/panels/{semantic_id}/topics",
+      "function_name": "get_topics_by_panel",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 114,
+      "tags": [],
+      "summary": "",
+      "description": "获取Panel下的所有Topics",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/panels/{semantic_id}/topics')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/topics/{semantic_id}/scenarios",
+      "function_name": "get_scenarios_by_topic",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 153,
+      "tags": [],
+      "summary": "",
+      "description": "获取Topic下的所有临床场景",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/topics/{semantic_id}/scenarios')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/procedures",
+      "function_name": "list_procedures",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 205,
+      "tags": [],
+      "summary": "",
+      "description": "列出检查项目",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/procedures')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/scenarios/{scenario_id}/recommendations",
+      "function_name": "get_recommendations_for_scenario",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 245,
+      "tags": [],
+      "summary": "",
+      "description": "获取场景的所有推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/scenarios/{scenario_id}/recommendations')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/modality-distribution",
+      "function_name": "get_modality_distribution",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 301,
+      "tags": [],
+      "summary": "",
+      "description": "获取检查方式分布",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/analytics/modality-distribution')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/rating-distribution",
+      "function_name": "get_rating_distribution",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 321,
+      "tags": [],
+      "summary": "",
+      "description": "获取适宜性评分分布",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/analytics/rating-distribution')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/quick/high-rating-recommendations",
+      "function_name": "get_high_rating_recommendations",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 343,
+      "tags": [],
+      "summary": "",
+      "description": "获取高评分推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/quick/high-rating-recommendations')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/quick/procedures-by-modality/{modality}",
+      "function_name": "get_procedures_by_modality",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 394,
+      "tags": [],
+      "summary": "",
+      "description": "按检查方式获取检查项目",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/quick/procedures-by-modality/{modality}')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/examples/complete-recommendation",
+      "function_name": "get_complete_recommendation_example",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 427,
+      "tags": [],
+      "summary": "",
+      "description": "获取完整推荐示例",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/examples/complete-recommendation')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/procedures",
+      "function_name": "search_procedures_simple",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 490,
+      "tags": [],
+      "summary": "",
+      "description": "简单的检查项目搜索",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/search/procedures')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/recommendations",
+      "function_name": "search_recommendations_simple",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 538,
+      "tags": [],
+      "summary": "",
+      "description": "简单的推荐搜索",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/search/recommendations')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/vector-method",
+      "function_name": "vector_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 53,
+      "tags": [],
+      "summary": "",
+      "description": "方法1：向量检索推荐\n\n使用纯向量相似度搜索，基于患者描述找到最相似的临床推荐\n- 优点：响应快速，基于语义相似度\n- 缺点：缺乏临床推理，可能不够个性化",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/vector-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/llm-method",
+      "function_name": "llm_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 118,
+      "tags": [],
+      "summary": "",
+      "description": "方法2：LLM分析推荐\n\n使用纯LLM进行临床推理分析，基于医学知识给出推荐\n- 优点：临床推理能力强，个性化程度高\n- 缺点：响应较慢，需要LLM服务支持",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/llm-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/rag-method",
+      "function_name": "rag_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 181,
+      "tags": [],
+      "summary": "",
+      "description": "方法3：RAG混合推荐\n\n使用向量检索+LLM分析的混合方法，结合两种方法的优势\n- 优点：既有语义检索的快速性，又有LLM的推理能力\n- 缺点：响应时间介于两者之间",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/rag-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/compare-all-methods",
+      "function_name": "compare_all_methods",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 244,
+      "tags": [],
+      "summary": "",
+      "description": "对比三种推荐方法\n\n同时调用三种方法，返回对比结果",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/compare-all-methods')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/analyze-case",
+      "function_name": "analyze_clinical_case",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 61,
+      "tags": [],
+      "summary": "",
+      "description": "智能临床案例分析\n\n使用三层混合推荐架构：\n1. 向量检索：基于语义相似度召回相关推荐\n2. 规则过滤：基于医疗规则和患者特征过滤\n3. LLM分析：智能临床推理和个性化推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/analyze-case', response_model=ClinicalAnalysisResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/quick-analysis",
+      "function_name": "quick_clinical_analysis",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 101,
+      "tags": [],
+      "summary": "",
+      "description": "快速临床分析 - 简化版本",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/quick-analysis')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/compare-methods",
+      "function_name": "compare_recommendation_methods",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 156,
+      "tags": [],
+      "summary": "",
+      "description": "比较不同推荐方法的结果",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/compare-methods')"
+      ]
+    }
+  ],
+  "frontend_calls": [
+    {
+      "endpoint": "./api/http",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 11,
+      "function_name": "unknown",
+      "component_name": "App",
+      "call_type": "string_literal",
+      "context": "import { api } from './api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 35,
+      "function_name": "unknown",
+      "component_name": "App",
+      "call_type": "axios",
+      "context": "api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 35,
+      "function_name": "unknown",
+      "component_name": "App",
+      "call_type": "string_literal",
+      "context": "api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "POST",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 43,
+      "function_name": "updateRules",
+      "component_name": "App",
+      "call_type": "axios",
+      "context": "const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 43,
+      "function_name": "updateRules",
+      "component_name": "App",
+      "call_type": "string_literal",
+      "context": "const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/upload",
+      "method": "POST",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 19,
+      "function_name": "customRequest",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })",
+      "parameters": [
+        "form",
+        "{ headers: { 'Content-Type': 'multipart/form-data' } }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/admin/data/upload",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 19,
+      "function_name": "customRequest",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })",
+      "parameters": [
+        "form",
+        "{ headers: { 'Content-Type': 'multipart/form-data' } }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/admin/data/import",
+      "method": "POST",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 34,
+      "function_name": "onFinish",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/admin/data/import', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/import",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 34,
+      "function_name": "onFinish",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/import', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 53,
+      "function_name": "handleValidate",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 53,
+      "function_name": "handleValidate",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')",
+      "parameters": []
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "format",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 13,
+      "function_name": "load",
+      "component_name": "format",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/rag-llm/rules-packs')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 13,
+      "function_name": "load",
+      "component_name": "format",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/rag-llm/rules-packs')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 26,
+      "function_name": "save",
+      "component_name": "format",
+      "call_type": "axios",
+      "context": "await api.post('/api/v1/acrac/rag-llm/rules-packs', { content: obj })",
+      "parameters": [
+        "{ content: obj }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 26,
+      "function_name": "save",
+      "component_name": "format",
+      "call_type": "string_literal",
+      "context": "await api.post('/api/v1/acrac/rag-llm/rules-packs', { content: obj })",
+      "parameters": [
+        "{ content: obj }"
+      ]
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/vector/search",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 45,
+      "function_name": "doVector",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/vector/search', v)",
+      "parameters": [
+        "v"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/vector/search",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 45,
+      "function_name": "doVector",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/vector/search', v)",
+      "parameters": [
+        "v"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/rerank",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 54,
+      "function_name": "doRerank",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/rerank', { query: v.query, scenarios })",
+      "parameters": [
+        "{ query: v.query",
+        "scenarios }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/rerank",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 54,
+      "function_name": "doRerank",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/rerank', { query: v.query, scenarios })",
+      "parameters": [
+        "{ query: v.query",
+        "scenarios }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/llm/parse",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 63,
+      "function_name": "doParse",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/llm/parse', { llm_raw: parseText })",
+      "parameters": [
+        "{ llm_raw: parseText }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/llm/parse",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 63,
+      "function_name": "doParse",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/llm/parse', { llm_raw: parseText })",
+      "parameters": [
+        "{ llm_raw: parseText }"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/score",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 97,
+      "function_name": "unknown",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/ragas/score', payload)",
+      "parameters": [
+        "payload"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/score",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 97,
+      "function_name": "unknown",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/ragas/score', payload)",
+      "parameters": [
+        "payload"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/schema",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 106,
+      "function_name": "loadRagasSchema",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/tools/ragas/schema')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/schema",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 106,
+      "function_name": "loadRagasSchema",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/tools/ragas/schema')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 116,
+      "function_name": "loadVectorStatus",
+      "component_name": "loadExample",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 116,
+      "function_name": "loadVectorStatus",
+      "component_name": "loadExample",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')",
+      "parameters": []
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "getReason",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 26,
+      "function_name": "onFinish",
+      "component_name": "getReason",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', payload)",
+      "parameters": [
+        "payload"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 26,
+      "function_name": "onFinish",
+      "component_name": "getReason",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', payload)",
+      "parameters": [
+        "payload"
+      ]
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 4,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag/query",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 197,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.post('/api/v1/acrac/rag/query', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag/query",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 197,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/rag/query', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/test-cases",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 306,
+      "function_name": "fetchTestCases",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.get('/api/v1/acrac/test-cases')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/test-cases",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 306,
+      "function_name": "fetchTestCases",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.get('/api/v1/acrac/test-cases')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/ragas/history",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 332,
+      "function_name": "loadHistoryData",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.get('/api/v1/ragas/history', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/ragas/history",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 332,
+      "function_name": "loadHistoryData",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.get('/api/v1/ragas/history', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 398,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/upload-excel', formData, {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 398,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/upload-excel', formData, {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 455,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.post('/api/v1/ragas/evaluate', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 455,
+      "function_name": "unknown",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.post('/api/v1/ragas/evaluate', {",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${taskId}/status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 521,
+      "function_name": "startRagasStatusPolling",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios_template",
+      "context": "const response = await api.get(`/api/v1/ragas/evaluate/${taskId}/status`)",
+      "parameters": [
+        "`/api/v1/ragas/evaluate/${taskId}/status`"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${taskId}/results",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 529,
+      "function_name": "startRagasStatusPolling",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios_template",
+      "context": "const resultsResponse = await api.get(`/api/v1/ragas/evaluate/${taskId}/results`)",
+      "parameters": [
+        "`/api/v1/ragas/evaluate/${taskId}/results`"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${ragasTaskId}/stop",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 569,
+      "function_name": "stopRagasEvaluation",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios_template",
+      "context": "await api.post(`/api/v1/ragas/evaluate/${ragasTaskId}/stop`)",
+      "parameters": [
+        "`/api/v1/ragas/evaluate/${ragasTaskId}/stop`"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/start-evaluation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 594,
+      "function_name": "startExcelEvaluation",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "'/api/v1/acrac/excel-evaluation/start-evaluation',",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 614,
+      "function_name": "startExcelStatusPolling",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.get('/api/v1/acrac/excel-evaluation/evaluation-status')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 614,
+      "function_name": "startExcelStatusPolling",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.get('/api/v1/acrac/excel-evaluation/evaluation-status')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/stop-evaluation",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 639,
+      "function_name": "stopExcelEvaluation",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "await api.post('/api/v1/acrac/excel-evaluation/stop-evaluation')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/stop-evaluation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 639,
+      "function_name": "stopExcelEvaluation",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "await api.post('/api/v1/acrac/excel-evaluation/stop-evaluation')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/export-results",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 654,
+      "function_name": "exportExcelResults",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "axios",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/export-results')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/export-results",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 654,
+      "function_name": "exportExcelResults",
+      "component_name": "getCombinedRagasItems",
+      "call_type": "string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/export-results')",
+      "parameters": []
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 15,
+      "function_name": "load",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/admin/data/models/config')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 15,
+      "function_name": "load",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/models/config')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "POST",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 35,
+      "function_name": "save",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.post('/api/v1/admin/data/models/config', v)",
+      "parameters": [
+        "v"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 35,
+      "function_name": "save",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/models/config', v)",
+      "parameters": [
+        "v"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/reload",
+      "method": "POST",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 51,
+      "function_name": "reloadSvc",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "await api.post('/api/v1/admin/data/models/reload')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/reload",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 51,
+      "function_name": "reloadSvc",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "await api.post('/api/v1/admin/data/models/reload')",
+      "parameters": []
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 3,
+      "function_name": "unknown",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "import { api } from '../api/http'",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/panels",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 19,
+      "function_name": "loadPanels",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/panels')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/panels",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 19,
+      "function_name": "loadPanels",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/panels')",
+      "parameters": []
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/topics/by-panel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 27,
+      "function_name": "loadTopics",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/topics/by-panel', { params: { panel_id: pid }})",
+      "parameters": [
+        "{ params: { panel_id: pid }}"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/topics/by-panel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 27,
+      "function_name": "loadTopics",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/topics/by-panel', { params: { panel_id: pid }})",
+      "parameters": [
+        "{ params: { panel_id: pid }}"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/scenarios/by-topic",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 35,
+      "function_name": "loadScenarios",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/scenarios/by-topic', { params: { topic_id: tid }})",
+      "parameters": [
+        "{ params: { topic_id: tid }}"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/scenarios/by-topic",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 35,
+      "function_name": "loadScenarios",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/scenarios/by-topic', { params: { topic_id: tid }})",
+      "parameters": [
+        "{ params: { topic_id: tid }}"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/recommendations",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 43,
+      "function_name": "loadRecs",
+      "component_name": "Unknown",
+      "call_type": "axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/recommendations', { params: { scenario_id: sid, page: 1, size: 50 }})",
+      "parameters": [
+        "{ params: { scenario_id: sid",
+        "page: 1",
+        "size: 50 }}"
+      ]
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/recommendations",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 43,
+      "function_name": "loadRecs",
+      "component_name": "Unknown",
+      "call_type": "string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/recommendations', { params: { scenario_id: sid, page: 1, size: 50 }})",
+      "parameters": [
+        "{ params: { scenario_id: sid",
+        "page: 1",
+        "size: 50 }}"
+      ]
+    }
+  ],
+  "backend_calls": [
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 44,
+      "function_name": "upload_excel_file",
+      "call_type": "string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/upload-excel\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/start-evaluation",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 67,
+      "function_name": "start_evaluation",
+      "call_type": "string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/start-evaluation\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 90,
+      "function_name": "check_evaluation_status",
+      "call_type": "string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-status\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 108,
+      "function_name": "get_evaluation_history",
+      "call_type": "string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history/{task_id}",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 134,
+      "function_name": "get_task_results",
+      "call_type": "string_literal",
+      "context": "url = f\"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history/{task_id}\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8001/api/v1/ragas/evaluate",
+      "method": "GET",
+      "file_path": "backend/test_ragas_api.py",
+      "line_number": 41,
+      "function_name": "unknown",
+      "call_type": "test",
+      "context": "'http://127.0.0.1:8001/api/v1/ragas/evaluate',",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8001/api/v1",
+      "method": "GET",
+      "file_path": "backend/test_ragas_complete.py",
+      "line_number": 15,
+      "function_name": "unknown",
+      "call_type": "test",
+      "context": "API_BASE = \"http://127.0.0.1:8001/api/v1\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/test_ragas_complete.py",
+      "line_number": 123,
+      "function_name": "test_ragas_evaluation",
+      "call_type": "test",
+      "context": "\"base_url\": \"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "/api/v1",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 11,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "API_V1_STR: str = \"/api/v1\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 50,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "SILICONFLOW_BASE_URL: str = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 59,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "RAG_API_URL: str = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/schemas/ragas_schemas.py",
+      "line_number": 94,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "base_url: Optional[str] = Field(\"https://api.siliconflow.cn/v1\", description=\"模型API基础URL\")",
+      "parameters": [
+        "description=\"模型API基础URL\""
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_api.py",
+      "line_number": 594,
+      "function_name": "unknown",
+      "call_type": "internal_api",
+      "context": "rag_api_url_env = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_api.py",
+      "line_number": 1164,
+      "function_name": "run_real_rag_evaluation",
+      "call_type": "internal_api",
+      "context": "rag_api_url = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")",
+      "parameters": [],
+      "is_async": true
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/admin_data_api.py",
+      "line_number": 191,
+      "function_name": "has",
+      "call_type": "internal_api",
+      "context": "'base_url': os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1'),",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 52,
+      "function_name": "unknown",
+      "call_type": "internal_api",
+      "context": "base_url: str = \"https://api.siliconflow.cn/v1\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 70,
+      "function_name": "setup_models",
+      "call_type": "internal_api",
+      "context": "def setup_models(self, model_name: str = \"gpt-3.5-turbo\", base_url: str = \"https://api.siliconflow.cn/v1\"):",
+      "parameters": [
+        "self",
+        "model_name: str = \"gpt-3.5-turbo\"",
+        "base_url: str = \"https://api.siliconflow.cn/v1\""
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 192,
+      "function_name": "run_evaluation",
+      "call_type": "internal_api",
+      "context": "def run_evaluation(self, test_cases: List[Dict[str, Any]], model_name: str = \"gpt-3.5-turbo\", base_url: str = \"https://api.siliconflow.cn/v1\") -> Dict[str, Any]:",
+      "parameters": [
+        "self",
+        "test_cases: List[Dict[str",
+        "Any]]",
+        "model_name: str = \"gpt-3.5-turbo\"",
+        "base_url: str = \"https://api.siliconflow.cn/v1\""
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/excel_evaluation_api.py",
+      "line_number": 43,
+      "function_name": "__init__",
+      "call_type": "internal_api",
+      "context": "self.api_url = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/vector_search_service.py",
+      "line_number": 33,
+      "function_name": "__init__",
+      "call_type": "internal_service",
+      "context": "self.base_url = \"https://api.siliconflow.cn/v1/embeddings\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/ragas_evaluator.py",
+      "line_number": 48,
+      "function_name": "unknown",
+      "call_type": "internal_service",
+      "context": "self.base_url = base_url or os.getenv(\"OPENAI_BASE_URL\") or os.getenv(\"SILICONFLOW_BASE_URL\") or \"https://api.siliconflow.cn/v1\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "POST",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 45,
+      "function_name": "embed_with_siliconflow",
+      "call_type": "internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)",
+      "parameters": [
+        "json=payload",
+        "headers=headers",
+        "timeout=timeout"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 45,
+      "function_name": "embed_with_siliconflow",
+      "call_type": "internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)",
+      "parameters": [
+        "json=payload",
+        "headers=headers",
+        "timeout=timeout"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 68,
+      "function_name": "__init__",
+      "call_type": "internal_service",
+      "context": "base_url=\"https://api.siliconflow.cn/v1\"",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 1011,
+      "function_name": "_compute_ragas_scores",
+      "call_type": "internal_service",
+      "context": "base_url = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 1167,
+      "function_name": "_siliconflow_rerank_scenarios",
+      "call_type": "internal_service",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://localhost:11434/api/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/intelligent_recommendation_service.py",
+      "line_number": 674,
+      "function_name": "_generate_query_vector",
+      "call_type": "internal_service",
+      "context": "\"http://localhost:11434/api/embeddings\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/services/ragas_service.py",
+      "line_number": 187,
+      "function_name": "unknown",
+      "call_type": "internal_service",
+      "context": "\"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "{self.base_url}/api/tags",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 22,
+      "function_name": "check_availability",
+      "call_type": "internal_service",
+      "context": "response = requests.get(f\"{self.base_url}/api/tags\", timeout=5)",
+      "parameters": [
+        "f\"{self.base_url}/api/tags\"",
+        "timeout=5"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "{self.base_url}/api/tags",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 22,
+      "function_name": "check_availability",
+      "call_type": "internal_service",
+      "context": "response = requests.get(f\"{self.base_url}/api/tags\", timeout=5)",
+      "parameters": [
+        "f\"{self.base_url}/api/tags\"",
+        "timeout=5"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "{self.base_url}/api/generate",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 177,
+      "function_name": "unknown",
+      "call_type": "internal_service",
+      "context": "f\"{self.base_url}/api/generate\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "{self.base_url}/api/pull",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 341,
+      "function_name": "install_model",
+      "call_type": "internal_service",
+      "context": "f\"{self.base_url}/api/pull\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "POST",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 45,
+      "function_name": "embed_with_siliconflow",
+      "call_type": "internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)",
+      "parameters": [
+        "json=payload",
+        "headers=headers",
+        "timeout=timeout"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 45,
+      "function_name": "embed_with_siliconflow",
+      "call_type": "internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)",
+      "parameters": [
+        "json=payload",
+        "headers=headers",
+        "timeout=timeout"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 68,
+      "function_name": "__init__",
+      "call_type": "internal_service",
+      "context": "base_url=os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1070,
+      "function_name": "_compute_ragas_scores",
+      "call_type": "internal_service",
+      "context": "base_url = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1192,
+      "function_name": "unknown",
+      "call_type": "internal_service",
+      "context": "base_url = os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1378,
+      "function_name": "_siliconflow_rerank_scenarios",
+      "call_type": "internal_service",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "{self.base_url}/api/v1/acrac/vector/v2/search/comprehensive",
+      "method": "GET",
+      "file_path": "backend/tests/quick_test_demo.py",
+      "line_number": 53,
+      "function_name": "test_vector_search_comprehensive",
+      "call_type": "test",
+      "context": "url = f\"{self.base_url}/api/v1/acrac/vector/v2/search/comprehensive\"",
+      "parameters": [],
+      "is_async": true
+    },
+    {
+      "endpoint": "{self.base_url}/api/v1/acrac/vector/v2/stats",
+      "method": "GET",
+      "file_path": "backend/tests/quick_test_demo.py",
+      "line_number": 101,
+      "function_name": "test_database_stats",
+      "call_type": "test",
+      "context": "async with session.get(f\"{self.base_url}/api/v1/acrac/vector/v2/stats\") as response:",
+      "parameters": [
+        "f\"{self.base_url}/api/v1/acrac/vector/v2/stats\""
+      ],
+      "is_async": true
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/official_ragas_evaluation.py",
+      "line_number": 66,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/official_ragas_evaluation.py",
+      "line_number": 74,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/comprehensive_ragas_demo.py",
+      "line_number": 54,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/comprehensive_ragas_demo.py",
+      "line_number": 62,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/RAGAS/trace_five_cases.py",
+      "line_number": 18,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "API = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/correct_ragas_solution.py",
+      "line_number": 66,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/correct_ragas_solution.py",
+      "line_number": 74,
+      "function_name": "setup_models",
+      "call_type": "string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\",",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/build_acrac_from_csv_siliconflow.py",
+      "line_number": 85,
+      "function_name": "__init__",
+      "call_type": "string_literal",
+      "context": "def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, endpoint: str = \"https://api.siliconflow.cn/v1\", allow_random: bool = False):",
+      "parameters": [
+        "self",
+        "api_key: Optional[str] = None",
+        "model: Optional[str] = None",
+        "endpoint: str = \"https://api.siliconflow.cn/v1\"",
+        "allow_random: bool = False"
+      ],
+      "is_async": false
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/scripts/run_ragas_eval_from_excel.py",
+      "line_number": 44,
+      "function_name": "main",
+      "call_type": "string_literal",
+      "context": "rag_api = os.getenv('RAG_API_URL', 'http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation')",
+      "parameters": [],
+      "is_async": true
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/test_siliconflow_reranker.py",
+      "line_number": 25,
+      "function_name": "test_rerank",
+      "call_type": "test",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")",
+      "parameters": [],
+      "is_async": false
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/update_procedure_embeddings.py",
+      "line_number": 10,
+      "function_name": "unknown",
+      "call_type": "string_literal",
+      "context": "API_BASE = os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')",
+      "parameters": [],
+      "is_async": false
+    }
+  ],
+  "usage_summary": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:16"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/statistics",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:49"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/panels",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:83"
+      ],
+      "used_in": [
+        "frontend/src/pages/DataBrowser.tsx:19",
+        "frontend/src/pages/DataBrowser.tsx:19"
+      ],
+      "usage_count": 2,
+      "is_used": true,
+      "usage_types": [
+        "frontend_axios",
+        "frontend_string_literal"
+      ]
+    },
+    {
+      "endpoint": "/panels/{semantic_id}/topics",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:114"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/topics/{semantic_id}/scenarios",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:153"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/procedures",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:205"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/scenarios/{scenario_id}/recommendations",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:245"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/analytics/modality-distribution",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:301"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/analytics/rating-distribution",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:321"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/quick/high-rating-recommendations",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:343"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/quick/procedures-by-modality/{modality}",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:394"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/examples/complete-recommendation",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:427"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/search/procedures",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:490"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/search/recommendations",
+      "method": "GET",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/acrac_simple.py:538"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/vector-method",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/three_methods_api.py:53"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/llm-method",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/three_methods_api.py:118"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/rag-method",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/three_methods_api.py:181"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/compare-all-methods",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/three_methods_api.py:244"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/analyze-case",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/intelligent_analysis.py:61"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/quick-analysis",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/intelligent_analysis.py:101"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    },
+    {
+      "endpoint": "/compare-methods",
+      "method": "POST",
+      "defined_in": [
+        "backend/app/api/api_v1/endpoints/intelligent_analysis.py:156"
+      ],
+      "used_in": [],
+      "usage_count": 0,
+      "is_used": false,
+      "usage_types": []
+    }
+  ],
+  "unused_endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "function_name": "health_check",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 16,
+      "tags": [],
+      "summary": "",
+      "description": "系统健康检查",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/health')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/statistics",
+      "function_name": "get_statistics",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 49,
+      "tags": [],
+      "summary": "",
+      "description": "获取详细统计信息",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/statistics')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/panels/{semantic_id}/topics",
+      "function_name": "get_topics_by_panel",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 114,
+      "tags": [],
+      "summary": "",
+      "description": "获取Panel下的所有Topics",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/panels/{semantic_id}/topics')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/topics/{semantic_id}/scenarios",
+      "function_name": "get_scenarios_by_topic",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 153,
+      "tags": [],
+      "summary": "",
+      "description": "获取Topic下的所有临床场景",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/topics/{semantic_id}/scenarios')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/procedures",
+      "function_name": "list_procedures",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 205,
+      "tags": [],
+      "summary": "",
+      "description": "列出检查项目",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/procedures')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/scenarios/{scenario_id}/recommendations",
+      "function_name": "get_recommendations_for_scenario",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 245,
+      "tags": [],
+      "summary": "",
+      "description": "获取场景的所有推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/scenarios/{scenario_id}/recommendations')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/modality-distribution",
+      "function_name": "get_modality_distribution",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 301,
+      "tags": [],
+      "summary": "",
+      "description": "获取检查方式分布",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/analytics/modality-distribution')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/rating-distribution",
+      "function_name": "get_rating_distribution",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 321,
+      "tags": [],
+      "summary": "",
+      "description": "获取适宜性评分分布",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/analytics/rating-distribution')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/quick/high-rating-recommendations",
+      "function_name": "get_high_rating_recommendations",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 343,
+      "tags": [],
+      "summary": "",
+      "description": "获取高评分推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/quick/high-rating-recommendations')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/quick/procedures-by-modality/{modality}",
+      "function_name": "get_procedures_by_modality",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 394,
+      "tags": [],
+      "summary": "",
+      "description": "按检查方式获取检查项目",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/quick/procedures-by-modality/{modality}')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/examples/complete-recommendation",
+      "function_name": "get_complete_recommendation_example",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 427,
+      "tags": [],
+      "summary": "",
+      "description": "获取完整推荐示例",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/examples/complete-recommendation')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/procedures",
+      "function_name": "search_procedures_simple",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 490,
+      "tags": [],
+      "summary": "",
+      "description": "简单的检查项目搜索",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/search/procedures')"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/recommendations",
+      "function_name": "search_recommendations_simple",
+      "file_path": "backend/app/api/api_v1/endpoints/acrac_simple.py",
+      "line_number": 538,
+      "tags": [],
+      "summary": "",
+      "description": "简单的推荐搜索",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.get('/search/recommendations')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/vector-method",
+      "function_name": "vector_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 53,
+      "tags": [],
+      "summary": "",
+      "description": "方法1：向量检索推荐\n\n使用纯向量相似度搜索，基于患者描述找到最相似的临床推荐\n- 优点：响应快速，基于语义相似度\n- 缺点：缺乏临床推理，可能不够个性化",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/vector-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/llm-method",
+      "function_name": "llm_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 118,
+      "tags": [],
+      "summary": "",
+      "description": "方法2：LLM分析推荐\n\n使用纯LLM进行临床推理分析，基于医学知识给出推荐\n- 优点：临床推理能力强，个性化程度高\n- 缺点：响应较慢，需要LLM服务支持",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/llm-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/rag-method",
+      "function_name": "rag_method_recommendation",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 181,
+      "tags": [],
+      "summary": "",
+      "description": "方法3：RAG混合推荐\n\n使用向量检索+LLM分析的混合方法，结合两种方法的优势\n- 优点：既有语义检索的快速性，又有LLM的推理能力\n- 缺点：响应时间介于两者之间",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/rag-method', response_model=RecommendationResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/compare-all-methods",
+      "function_name": "compare_all_methods",
+      "file_path": "backend/app/api/api_v1/endpoints/three_methods_api.py",
+      "line_number": 244,
+      "tags": [],
+      "summary": "",
+      "description": "对比三种推荐方法\n\n同时调用三种方法，返回对比结果",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/compare-all-methods')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/analyze-case",
+      "function_name": "analyze_clinical_case",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 61,
+      "tags": [],
+      "summary": "",
+      "description": "智能临床案例分析\n\n使用三层混合推荐架构：\n1. 向量检索：基于语义相似度召回相关推荐\n2. 规则过滤：基于医疗规则和患者特征过滤\n3. LLM分析：智能临床推理和个性化推荐",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/analyze-case', response_model=ClinicalAnalysisResponse)"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/quick-analysis",
+      "function_name": "quick_clinical_analysis",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 101,
+      "tags": [],
+      "summary": "",
+      "description": "快速临床分析 - 简化版本",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/quick-analysis')"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/compare-methods",
+      "function_name": "compare_recommendation_methods",
+      "file_path": "backend/app/api/api_v1/endpoints/intelligent_analysis.py",
+      "line_number": 156,
+      "tags": [],
+      "summary": "",
+      "description": "比较不同推荐方法的结果",
+      "parameters": [],
+      "responses": {},
+      "dependencies": [],
+      "decorators": [
+        "router.post('/compare-methods')"
+      ]
+    }
+  ],
+  "undefined_usage": [
+    {
+      "endpoint": "./api/http",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 11,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from './api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 35,
+      "call_type": "frontend_axios",
+      "context": "api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 35,
+      "call_type": "frontend_string_literal",
+      "context": "api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "POST",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 43,
+      "call_type": "frontend_axios",
+      "context": "const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-config",
+      "method": "GET",
+      "file_path": "frontend/src/App.tsx",
+      "line_number": 43,
+      "call_type": "frontend_string_literal",
+      "context": "const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/upload",
+      "method": "POST",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 19,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/upload",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 19,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/import",
+      "method": "POST",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 34,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/admin/data/import', {"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/import",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 34,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/import', {"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 53,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataImport.tsx",
+      "line_number": 53,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 13,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/rag-llm/rules-packs')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 13,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/rag-llm/rules-packs')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 26,
+      "call_type": "frontend_axios",
+      "context": "await api.post('/api/v1/acrac/rag-llm/rules-packs', { content: obj })"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/rules-packs",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RulesManager.tsx",
+      "line_number": 26,
+      "call_type": "frontend_string_literal",
+      "context": "await api.post('/api/v1/acrac/rag-llm/rules-packs', { content: obj })"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/vector/search",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 45,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/vector/search', v)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/vector/search",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 45,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/vector/search', v)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/rerank",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 54,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/rerank', { query: v.query, scenarios })"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/rerank",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 54,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/rerank', { query: v.query, scenarios })"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/llm/parse",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 63,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/llm/parse', { llm_raw: parseText })"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/llm/parse",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 63,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/llm/parse', { llm_raw: parseText })"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/score",
+      "method": "POST",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 97,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/acrac/tools/ragas/score', payload)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/score",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 97,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/tools/ragas/score', payload)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/schema",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 106,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/tools/ragas/schema')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/tools/ragas/schema",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 106,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/tools/ragas/schema')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 116,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/validate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/Tools.tsx",
+      "line_number": 116,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/validate')"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 26,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', payload)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGAssistant.tsx",
+      "line_number": 26,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', payload)"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 4,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag/query",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 197,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.post('/api/v1/acrac/rag/query', {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/rag/query",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 197,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/rag/query', {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/test-cases",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 306,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.get('/api/v1/acrac/test-cases')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/test-cases",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 306,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.get('/api/v1/acrac/test-cases')"
+    },
+    {
+      "endpoint": "/api/v1/ragas/history",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 332,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.get('/api/v1/ragas/history', {"
+    },
+    {
+      "endpoint": "/api/v1/ragas/history",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 332,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.get('/api/v1/ragas/history', {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 398,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/upload-excel', formData, {"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 398,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/upload-excel', formData, {"
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 455,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.post('/api/v1/ragas/evaluate', {"
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 455,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.post('/api/v1/ragas/evaluate', {"
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${taskId}/status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 521,
+      "call_type": "frontend_axios_template",
+      "context": "const response = await api.get(`/api/v1/ragas/evaluate/${taskId}/status`)"
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${taskId}/results",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 529,
+      "call_type": "frontend_axios_template",
+      "context": "const resultsResponse = await api.get(`/api/v1/ragas/evaluate/${taskId}/results`)"
+    },
+    {
+      "endpoint": "/api/v1/ragas/evaluate/${ragasTaskId}/stop",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 569,
+      "call_type": "frontend_axios_template",
+      "context": "await api.post(`/api/v1/ragas/evaluate/${ragasTaskId}/stop`)"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/start-evaluation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 594,
+      "call_type": "frontend_string_literal",
+      "context": "'/api/v1/acrac/excel-evaluation/start-evaluation',"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 614,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.get('/api/v1/acrac/excel-evaluation/evaluation-status')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 614,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.get('/api/v1/acrac/excel-evaluation/evaluation-status')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/stop-evaluation",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 639,
+      "call_type": "frontend_axios",
+      "context": "await api.post('/api/v1/acrac/excel-evaluation/stop-evaluation')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/stop-evaluation",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 639,
+      "call_type": "frontend_string_literal",
+      "context": "await api.post('/api/v1/acrac/excel-evaluation/stop-evaluation')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/export-results",
+      "method": "POST",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 654,
+      "call_type": "frontend_axios",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/export-results')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/excel-evaluation/export-results",
+      "method": "GET",
+      "file_path": "frontend/src/pages/RAGEvaluation.tsx",
+      "line_number": 654,
+      "call_type": "frontend_string_literal",
+      "context": "const response = await api.post('/api/v1/acrac/excel-evaluation/export-results')"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 15,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/admin/data/models/config')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 15,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/admin/data/models/config')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "POST",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 35,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.post('/api/v1/admin/data/models/config', v)"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/config",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 35,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.post('/api/v1/admin/data/models/config', v)"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/reload",
+      "method": "POST",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 51,
+      "call_type": "frontend_axios",
+      "context": "await api.post('/api/v1/admin/data/models/reload')"
+    },
+    {
+      "endpoint": "/api/v1/admin/data/models/reload",
+      "method": "GET",
+      "file_path": "frontend/src/pages/ModelConfig.tsx",
+      "line_number": 51,
+      "call_type": "frontend_string_literal",
+      "context": "await api.post('/api/v1/admin/data/models/reload')"
+    },
+    {
+      "endpoint": "../api/http",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 3,
+      "call_type": "frontend_string_literal",
+      "context": "import { api } from '../api/http'"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/panels",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 19,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/panels')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/panels",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 19,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/panels')"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/topics/by-panel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 27,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/topics/by-panel', { params: { panel_id: pid }})"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/topics/by-panel",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 27,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/topics/by-panel', { params: { panel_id: pid }})"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/scenarios/by-topic",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 35,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/scenarios/by-topic', { params: { topic_id: tid }})"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/scenarios/by-topic",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 35,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/scenarios/by-topic', { params: { topic_id: tid }})"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/recommendations",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 43,
+      "call_type": "frontend_axios",
+      "context": "const r = await api.get('/api/v1/acrac/data/recommendations', { params: { scenario_id: sid, page: 1, size: 50 }})"
+    },
+    {
+      "endpoint": "/api/v1/acrac/data/recommendations",
+      "method": "GET",
+      "file_path": "frontend/src/pages/DataBrowser.tsx",
+      "line_number": 43,
+      "call_type": "frontend_string_literal",
+      "context": "const r = await api.get('/api/v1/acrac/data/recommendations', { params: { scenario_id: sid, page: 1, size: 50 }})"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/upload-excel",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 44,
+      "call_type": "backend_string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/upload-excel\""
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/start-evaluation",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 67,
+      "call_type": "backend_string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/start-evaluation\""
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-status",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 90,
+      "call_type": "backend_string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-status\""
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 108,
+      "call_type": "backend_string_literal",
+      "context": "url = \"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history\""
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history/{task_id}",
+      "method": "GET",
+      "file_path": "backend/demo_excel_evaluation.py",
+      "line_number": 134,
+      "call_type": "backend_string_literal",
+      "context": "url = f\"http://127.0.0.1:8002/api/v1/acrac/excel-evaluation/evaluation-history/{task_id}\""
+    },
+    {
+      "endpoint": "http://127.0.0.1:8001/api/v1/ragas/evaluate",
+      "method": "GET",
+      "file_path": "backend/test_ragas_api.py",
+      "line_number": 41,
+      "call_type": "backend_test",
+      "context": "'http://127.0.0.1:8001/api/v1/ragas/evaluate',"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8001/api/v1",
+      "method": "GET",
+      "file_path": "backend/test_ragas_complete.py",
+      "line_number": 15,
+      "call_type": "backend_test",
+      "context": "API_BASE = \"http://127.0.0.1:8001/api/v1\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/test_ragas_complete.py",
+      "line_number": 123,
+      "call_type": "backend_test",
+      "context": "\"base_url\": \"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "/api/v1",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 11,
+      "call_type": "backend_string_literal",
+      "context": "API_V1_STR: str = \"/api/v1\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 50,
+      "call_type": "backend_string_literal",
+      "context": "SILICONFLOW_BASE_URL: str = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/core/config.py",
+      "line_number": 59,
+      "call_type": "backend_string_literal",
+      "context": "RAG_API_URL: str = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/schemas/ragas_schemas.py",
+      "line_number": 94,
+      "call_type": "backend_string_literal",
+      "context": "base_url: Optional[str] = Field(\"https://api.siliconflow.cn/v1\", description=\"模型API基础URL\")"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_api.py",
+      "line_number": 594,
+      "call_type": "backend_internal_api",
+      "context": "rag_api_url_env = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_api.py",
+      "line_number": 1164,
+      "call_type": "backend_internal_api",
+      "context": "rag_api_url = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/admin_data_api.py",
+      "line_number": 191,
+      "call_type": "backend_internal_api",
+      "context": "'base_url': os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1'),"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 52,
+      "call_type": "backend_internal_api",
+      "context": "base_url: str = \"https://api.siliconflow.cn/v1\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 70,
+      "call_type": "backend_internal_api",
+      "context": "def setup_models(self, model_name: str = \"gpt-3.5-turbo\", base_url: str = \"https://api.siliconflow.cn/v1\"):"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/ragas_evaluation_api.py",
+      "line_number": 192,
+      "call_type": "backend_internal_api",
+      "context": "def run_evaluation(self, test_cases: List[Dict[str, Any]], model_name: str = \"gpt-3.5-turbo\", base_url: str = \"https://api.siliconflow.cn/v1\") -> Dict[str, Any]:"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/api/api_v1/endpoints/excel_evaluation_api.py",
+      "line_number": 43,
+      "call_type": "backend_internal_api",
+      "context": "self.api_url = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/vector_search_service.py",
+      "line_number": 33,
+      "call_type": "backend_internal_service",
+      "context": "self.base_url = \"https://api.siliconflow.cn/v1/embeddings\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/ragas_evaluator.py",
+      "line_number": 48,
+      "call_type": "backend_internal_service",
+      "context": "self.base_url = base_url or os.getenv(\"OPENAI_BASE_URL\") or os.getenv(\"SILICONFLOW_BASE_URL\") or \"https://api.siliconflow.cn/v1\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "POST",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 45,
+      "call_type": "backend_internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 45,
+      "call_type": "backend_internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 68,
+      "call_type": "backend_internal_service",
+      "context": "base_url=\"https://api.siliconflow.cn/v1\""
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 1011,
+      "call_type": "backend_internal_service",
+      "context": "base_url = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service_副本.py",
+      "line_number": 1167,
+      "call_type": "backend_internal_service",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "http://localhost:11434/api/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/intelligent_recommendation_service.py",
+      "line_number": 674,
+      "call_type": "backend_internal_service",
+      "context": "\"http://localhost:11434/api/embeddings\","
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/app/services/ragas_service.py",
+      "line_number": 187,
+      "call_type": "backend_internal_service",
+      "context": "\"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\","
+    },
+    {
+      "endpoint": "{self.base_url}/api/tags",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 22,
+      "call_type": "backend_internal_service",
+      "context": "response = requests.get(f\"{self.base_url}/api/tags\", timeout=5)"
+    },
+    {
+      "endpoint": "{self.base_url}/api/tags",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 22,
+      "call_type": "backend_internal_service",
+      "context": "response = requests.get(f\"{self.base_url}/api/tags\", timeout=5)"
+    },
+    {
+      "endpoint": "{self.base_url}/api/generate",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 177,
+      "call_type": "backend_internal_service",
+      "context": "f\"{self.base_url}/api/generate\","
+    },
+    {
+      "endpoint": "{self.base_url}/api/pull",
+      "method": "GET",
+      "file_path": "backend/app/services/ollama_qwen_service.py",
+      "line_number": 341,
+      "call_type": "backend_internal_service",
+      "context": "f\"{self.base_url}/api/pull\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "POST",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 45,
+      "call_type": "backend_internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 45,
+      "call_type": "backend_internal_service",
+      "context": "resp = requests.post(\"https://api.siliconflow.cn/v1/embeddings\", json=payload, headers=headers, timeout=timeout)"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 68,
+      "call_type": "backend_internal_service",
+      "context": "base_url=os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1070,
+      "call_type": "backend_internal_service",
+      "context": "base_url = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1192,
+      "call_type": "backend_internal_service",
+      "context": "base_url = os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/app/services/rag_llm_recommendation_service.py",
+      "line_number": 1378,
+      "call_type": "backend_internal_service",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "{self.base_url}/api/v1/acrac/vector/v2/search/comprehensive",
+      "method": "GET",
+      "file_path": "backend/tests/quick_test_demo.py",
+      "line_number": 53,
+      "call_type": "backend_test",
+      "context": "url = f\"{self.base_url}/api/v1/acrac/vector/v2/search/comprehensive\""
+    },
+    {
+      "endpoint": "{self.base_url}/api/v1/acrac/vector/v2/stats",
+      "method": "GET",
+      "file_path": "backend/tests/quick_test_demo.py",
+      "line_number": 101,
+      "call_type": "backend_test",
+      "context": "async with session.get(f\"{self.base_url}/api/v1/acrac/vector/v2/stats\") as response:"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/official_ragas_evaluation.py",
+      "line_number": 66,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/official_ragas_evaluation.py",
+      "line_number": 74,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/comprehensive_ragas_demo.py",
+      "line_number": 54,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/comprehensive_ragas_demo.py",
+      "line_number": 62,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/RAGAS/trace_five_cases.py",
+      "line_number": 18,
+      "call_type": "backend_string_literal",
+      "context": "API = os.getenv(\"RAG_API_URL\", \"http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/correct_ragas_solution.py",
+      "line_number": 66,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/RAGAS/correct_ragas_solution.py",
+      "line_number": 74,
+      "call_type": "backend_string_literal",
+      "context": "openai_api_base=\"https://api.siliconflow.cn/v1\","
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/build_acrac_from_csv_siliconflow.py",
+      "line_number": 85,
+      "call_type": "backend_string_literal",
+      "context": "def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, endpoint: str = \"https://api.siliconflow.cn/v1\", allow_random: bool = False):"
+    },
+    {
+      "endpoint": "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+      "method": "GET",
+      "file_path": "backend/scripts/run_ragas_eval_from_excel.py",
+      "line_number": 44,
+      "call_type": "backend_string_literal",
+      "context": "rag_api = os.getenv('RAG_API_URL', 'http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation')"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/test_siliconflow_reranker.py",
+      "line_number": 25,
+      "call_type": "backend_test",
+      "context": "base = os.getenv(\"SILICONFLOW_BASE_URL\", \"https://api.siliconflow.cn/v1\")"
+    },
+    {
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "method": "GET",
+      "file_path": "backend/scripts/update_procedure_embeddings.py",
+      "line_number": 10,
+      "call_type": "backend_string_literal",
+      "context": "API_BASE = os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')"
+    }
+  ],
+  "recommendations": [
+    "发现 20 个未使用的API端点，建议检查是否需要删除或添加使用",
+    "  - GET /health (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:16)",
+    "  - GET /statistics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:49)",
+    "  - GET /panels/{semantic_id}/topics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:114)",
+    "  - GET /topics/{semantic_id}/scenarios (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:153)",
+    "  - GET /procedures (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:205)",
+    "发现 121 个未定义的API使用，建议检查是否为外部API或需要添加定义",
+    "  - GET ./api/http (使用在 frontend/src/App.tsx:11)",
+    "  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)",
+    "  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)",
+    "  - POST /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)",
+    "  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)",
+    "API使用率较低 (4.8%)，建议检查是否有冗余的端点"
+  ]
+}

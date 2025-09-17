@@ -1,0 +1,153 @@
+================================================================================
+ACRAC API端点使用情况综合检测报告
+================================================================================
+生成时间: 2025-09-15T09:48:38.115042
+项目根目录: /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web
+
+📊 检测摘要
+----------------------------------------
+总API端点数量: 21
+已使用端点数量: 1
+未使用端点数量: 20
+使用率: 4.8%
+总使用次数: 121
+前端使用次数: 70
+后端使用次数: 51
+
+⚠️ 未使用的API端点
+----------------------------------------
+1. GET /health
+   函数: health_check
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:16
+   描述: 系统健康检查
+
+2. GET /statistics
+   函数: get_statistics
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:49
+   描述: 获取详细统计信息
+
+3. GET /panels/{semantic_id}/topics
+   函数: get_topics_by_panel
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:114
+   描述: 获取Panel下的所有Topics
+
+4. GET /topics/{semantic_id}/scenarios
+   函数: get_scenarios_by_topic
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:153
+   描述: 获取Topic下的所有临床场景
+
+5. GET /procedures
+   函数: list_procedures
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:205
+   描述: 列出检查项目
+
+6. GET /scenarios/{scenario_id}/recommendations
+   函数: get_recommendations_for_scenario
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:245
+   描述: 获取场景的所有推荐
+
+7. GET /analytics/modality-distribution
+   函数: get_modality_distribution
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:301
+   描述: 获取检查方式分布
+
+8. GET /analytics/rating-distribution
+   函数: get_rating_distribution
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:321
+   描述: 获取适宜性评分分布
+
+9. GET /quick/high-rating-recommendations
+   函数: get_high_rating_recommendations
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:343
+   描述: 获取高评分推荐
+
+10. GET /quick/procedures-by-modality/{modality}
+   函数: get_procedures_by_modality
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:394
+   描述: 按检查方式获取检查项目
+
+11. GET /examples/complete-recommendation
+   函数: get_complete_recommendation_example
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:427
+   描述: 获取完整推荐示例
+
+12. GET /search/procedures
+   函数: search_procedures_simple
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:490
+   描述: 简单的检查项目搜索
+
+13. GET /search/recommendations
+   函数: search_recommendations_simple
+   文件: backend/app/api/api_v1/endpoints/acrac_simple.py:538
+   描述: 简单的推荐搜索
+
+14. POST /vector-method
+   函数: vector_method_recommendation
+   文件: backend/app/api/api_v1/endpoints/three_methods_api.py:53
+   描述: 方法1：向量检索推荐
+
+使用纯向量相似度搜索，基于患者描述找到最相似的临床推荐
+- 优点：响应快速，基于语义相似度
+- 缺点：缺乏临床推理，可能不够个性化
+
+15. POST /llm-method
+   函数: llm_method_recommendation
+   文件: backend/app/api/api_v1/endpoints/three_methods_api.py:118
+   描述: 方法2：LLM分析推荐
+
+使用纯LLM进行临床推理分析，基于医学知识给出推荐
+- 优点：临床推理能力强，个性化程度高
+- 缺点：响应较慢，需要LLM服务支持
+
+16. POST /rag-method
+   函数: rag_method_recommendation
+   文件: backend/app/api/api_v1/endpoints/three_methods_api.py:181
+   描述: 方法3：RAG混合推荐
+
+使用向量检索+LLM分析的混合方法，结合两种方法的优势
+- 优点：既有语义检索的快速性，又有LLM的推理能力
+- 缺点：响应时间介于两者之间
+
+17. POST /compare-all-methods
+   函数: compare_all_methods
+   文件: backend/app/api/api_v1/endpoints/three_methods_api.py:244
+   描述: 对比三种推荐方法
+
+同时调用三种方法，返回对比结果
+
+18. POST /analyze-case
+   函数: analyze_clinical_case
+   文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:61
+   描述: 智能临床案例分析
+
+使用三层混合推荐架构：
+1. 向量检索：基于语义相似度召回相关推荐
+2. 规则过滤：基于医疗规则和患者特征过滤
+3. LLM分析：智能临床推理和个性化推荐
+
+19. POST /quick-analysis
+   函数: quick_clinical_analysis
+   文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:101
+   描述: 快速临床分析 - 简化版本
+
+20. POST /compare-methods
+   函数: compare_recommendation_methods
+   文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:156
+   描述: 比较不同推荐方法的结果
+
+💡 建议
+----------------------------------------
+1. 发现 20 个未使用的API端点，建议检查是否需要删除或添加使用
+2.   - GET /health (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:16)
+3.   - GET /statistics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:49)
+4.   - GET /panels/{semantic_id}/topics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:114)
+5.   - GET /topics/{semantic_id}/scenarios (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:153)
+6.   - GET /procedures (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:205)
+7. 发现 121 个未定义的API使用，建议检查是否为外部API或需要添加定义
+8.   - GET ./api/http (使用在 frontend/src/App.tsx:11)
+9.   - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)
+10.   - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)
+11.   - POST /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)
+12.   - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)
+13. API使用率较低 (4.8%)，建议检查是否有冗余的端点
+

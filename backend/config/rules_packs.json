@@ -1,0 +1,81 @@
+{
+  "packs": [
+    {
+      "id": "pregnancy_safety_post",
+      "scope": "post_llm",
+      "enabled": true,
+      "priority": 10,
+      "rules": [
+        {
+          "id": "warn_pregnancy_high_radiation",
+          "enabled": true,
+          "priority": 10,
+          "condition": {
+            "in": [
+              "query_signals.pregnancy_status",
+              [
+                "妊娠/围产"
+              ]
+            ]
+          },
+          "action": {
+            "type": "warn",
+            "message": "Pregnancy case: review radiation and contrast choices."
+          }
+        },
+        {
+          "id": "filter_ct_in_pregnancy",
+          "enabled": true,
+          "priority": 20,
+          "condition": {
+            "in": [
+              "query_signals.pregnancy_status",
+              [
+                "妊娠/围产"
+              ]
+            ]
+          },
+          "action": {
+            "type": "fix",
+            "field": "filter_procedures_by_keywords",
+            "strategy": "deny_if_any_contains",
+            "keywords": [
+              "CT",
+              "CTA",
+              "CTV"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tch_cta_boost",
+      "scope": "rerank",
+      "enabled": true,
+      "priority": 20,
+      "rules": [
+        {
+          "id": "boost_tch_scenarios",
+          "enabled": true,
+          "priority": 10,
+          "condition": {
+            "any_in": [
+              "query_signals.keywords",
+              [
+                "雷击样",
+                "霹雳样",
+                "TCH",
+                "SAH",
+                "蛛网膜下腔出血"
+              ]
+            ]
+          },
+          "action": {
+            "type": "boost",
+            "by": 0.15
+          }
+        }
+      ]
+    }
+  ]
+}

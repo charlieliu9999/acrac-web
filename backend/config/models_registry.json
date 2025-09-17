@@ -1,0 +1,68 @@
+{
+  "llms": [
+    {
+      "id": "siliconflow-llm-Qwen_Qwen3-32B",
+      "label": "Qwen/Qwen3-32B",
+      "provider": "siliconflow",
+      "kind": "llm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key": null,
+      "api_key_env": "sk-oqefiqblwjtjieoqaxcyeonlahffsjhxlpoduopcdugyjfpt"
+    },
+    {
+      "id": "ollama-llm-qwen3_30b",
+      "label": "qwen3:30b",
+      "provider": "ollama",
+      "kind": "llm",
+      "model": "qwen3:30b",
+      "base_url": "http://host.docker.internal:11434/v1",
+      "api_key": null,
+      "api_key_env": "nokey"
+    },
+    {
+      "id": "ollama-llm-qwen2.5_32b",
+      "label": "qwen2.5:32b",
+      "provider": "ollama",
+      "kind": "llm",
+      "model": "qwen2.5:32b",
+      "base_url": "http://host.docker.internal:11434/v1",
+      "api_key": null,
+      "api_key_env": "nokey"
+    }
+  ],
+  "embeddings": [
+    {
+      "id": "siliconflow-embedding-BAAI_bge-m3",
+      "label": "BAAI/bge-m3",
+      "provider": "siliconflow",
+      "kind": "embedding",
+      "model": "BAAI/bge-m3",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key": null,
+      "api_key_env": "sk-oqefiqblwjtjieoqaxcyeonlahffsjhxlpoduopcdugyjfpt"
+    },
+    {
+      "id": "ollama-embedding-bge-m3_latest",
+      "label": "bge-m3:latest",
+      "provider": "ollama",
+      "kind": "embedding",
+      "model": "bge-m3:latest",
+      "base_url": "http://host.docker.internal:11434/v1",
+      "api_key": null,
+      "api_key_env": "nokey"
+    }
+  ],
+  "rerankers": [
+    {
+      "id": "ollama-reranker-dengcao_bge-reranker-v2-m3",
+      "label": "dengcao/bge-reranker-v2-m3",
+      "provider": "ollama",
+      "kind": "reranker",
+      "model": "dengcao/bge-reranker-v2-m3",
+      "base_url": "http://host.docker.internal:11434//v1/rerank",
+      "api_key": "nokey",
+      "api_key_env": "nokey"
+    }
+  ]
+}

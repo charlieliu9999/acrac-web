@@ -1,0 +1,19 @@
+:root {
+  --primary: #1677ff;
+}
+.logo {
+  height: 48px;
+  margin: 16px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+.page-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+

@@ -1,0 +1,940 @@
+{
+  "success": true,
+  "query": "50岁女性，3天前开始出现左侧肢体无力，伴新发头痛。",
+  "message": null,
+  "llm_recommendations": {
+    "recommendations": [
+      {
+        "rank": 1,
+        "procedure_name": "MR颅脑(平扫+增强)",
+        "modality": "MRI",
+        "appropriateness_rating": "9/9",
+        "recommendation_reason": "头部MRI平扫+增强扫描可用于伴有上述一项或多项\"危险信号\"头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。",
+        "clinical_considerations": "鉴于患者出现左侧肢体无力和新发头痛，且年龄为50岁，存在神经功能缺损的警示征象，MRI平扫+增强有助于全面评估颅内情况。"
+      },
+      {
+        "rank": 2,
+        "procedure_name": "CT颅脑(平扫)",
+        "modality": "CT",
+        "appropriateness_rating": "7/9",
+        "recommendation_reason": "不注射静脉造影剂的头部CT可用于伴有以下一种或多种\"警示征象\"的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。",
+        "clinical_considerations": "CT检查快速，适用于急性情况下排除颅内出血等紧急情况。"
+      },
+      {
+        "rank": 3,
+        "procedure_name": "MR颅脑(平扫)",
+        "modality": "MRI",
+        "appropriateness_rating": "7/9",
+        "recommendation_reason": "不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\"警示征象\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。",
+        "clinical_considerations": "MRI具有更高的软组织分辨率，适用于非急性情况下进一步评估颅内结构。"
+      }
+    ],
+    "summary": "推荐使用MRI平扫+增强作为首选检查，CT平扫作为快速排除颅内出血的备选，MRI平扫用于进一步评估。",
+    "no_rag": false
+  },
+  "scenarios": [
+    {
+      "semantic_id": "S0827",
+      "description_zh": "伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较大（50岁）或创伤后发病 初始影像学检查",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.6261490173980371,
+      "_rerank_score": 0.50038886,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0828",
+      "description_zh": "不伴以下“警示征”的头痛：突发性（霹雳样）、颅内压增高或降低特征、妊娠期或围产期新发或模式改变、频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄50岁或创伤后发病 初始影像学检查",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": "急诊",
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.5849629814911842,
+      "_rerank_score": 0.3339375,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0826",
+      "description_zh": "妊娠期或围产期新发或模式改变头痛 初始影像学检查",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.5530783432494135,
+      "_rerank_score": 0.08195955,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0816",
+      "description_zh": "急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": "急诊",
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头部创伤",
+      "similarity": 0.5523293512162009,
+      "_rerank_score": 0.060197048,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0823",
+      "description_zh": "原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.554996983855879,
+      "_rerank_score": 0.055412795,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0825",
+      "description_zh": "具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.5705194303238685,
+      "_rerank_score": 0.03803509,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0824",
+      "description_zh": "具有颅内高压特征的头痛（如视乳头水肿、搏动性耳鸣、Valsalva动作加重视觉症状）初始影像学检查",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.5648148564828827,
+      "_rerank_score": 0.032405518,
+      "_rule_bonus": 0
+    },
+    {
+      "semantic_id": "S0821",
+      "description_zh": "突发严重头痛且1小时内达最高强度。初始影像学检查。",
+      "clinical_context": null,
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": "急诊",
+      "symptom_category": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "similarity": 0.5551385183756241,
+      "_rerank_score": 0.032100707,
+      "_rule_bonus": 0
+    }
+  ],
+  "scenarios_with_recommendations": [
+    {
+      "scenario_id": "S0827",
+      "scenario_description": "伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较大（50岁）或创伤后发病 初始影像学检查",
+      "description_zh": "伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较大（50岁）或创伤后发病 初始影像学检查",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "MR颅脑(平扫+增强)",
+          "procedure_name_en": "MRI Head Without and With IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 9,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "头部MRI平扫+增强扫描可用于伴有上述一项或多项“危险信号”头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。探讨“危险信号”作为神经影像学检查指征的文献认为，CT和MRI均可作为合适的初始检查方案。目前尚无具体数据支持哪种影像学检查更具优势，尤其是考虑到潜在病因的广泛性。鉴于MRI较CT具有更高的软组织分辨率，MRI可能成为首选的初始影像学检查方式，特别是在非急性情况下。多数文献将CT和MRI同时列为考虑的初始影像学检查方式[37,53,55,58]。对于头痛伴有一项或多项“危险信号”的患者，静脉注射对比剂有助于诊断存在血脑屏障破坏的肿瘤性或炎症性疾病[59]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "谨慎使用"
+        },
+        {
+          "procedure_name_zh": "CT颅脑(平扫)",
+          "procedure_name_en": "CT head without IV contrast",
+          "modality": "CT",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 7,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "不注射静脉造影剂的头部CT可用于伴有以下一种或多种“警示征象”的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。对于出现急性神经功能缺损或精神状态异常的患者，以及近期有外伤史的患者，头部CT作为初步检查有助于排除颅内出血引起的继发性头痛[55,56]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅脑(平扫)",
+          "procedure_name_en": "MRI Head Without IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 7,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\"警示征象\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。现有研究\"警示征象\"作为神经影像学检查指征的文献认为，CT和MRI均适合作为初始检查方案。目前尚无明确数据支持某种影像学检查更具优势，尤其考虑到潜在病因的广泛性。鉴于MRI较CT具有更高的软组织分辨率，在非急性情况下，MRI可能更适合作为首选影像学检查方式。多数文献将CT和MRI均列为初始影像学检查选项[37,53,55,58]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "谨慎使用"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0826",
+      "scenario_description": "妊娠期或围产期新发或模式改变头痛 初始影像学检查",
+      "description_zh": "妊娠期或围产期新发或模式改变头痛 初始影像学检查",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "MR颅脑(平扫)",
+          "procedure_name_en": "MRI Head Without IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 8,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "孕期或围产期新发头痛的初步影像学评估中，不注射静脉对比剂的头部MRI具有重要价值。妊娠期继发性头痛病因多样，包括：1. 雷击样头痛需排查动脉病变（如动脉瘤性蛛网膜下腔出血或可逆性脑血管收缩综合征），尤其产后患者（参见变异型1）；2. 结构性病变包括颅内肿瘤及垂体源性病变；3. 肥胖女性需特别考虑特发性颅内压增高（参见变异型4）；4. 子痫前期/子痫作为妊娠特发性疾病，可出现头痛伴后部可逆性脑病综合征（PRES）的神经影像学表现[47,49-51]。MRI是评估PRES血管源性水肿的金标准，FLAIR和T2加权像对后颅窝异常显示的敏感性显著优于CT（PRES患者CT异常率仅45%）。对于头痛伴新发癫痫患者，MRI可检出致病性占位/病变或PRES改变以支持子痫诊断[49,50]。垂体源性病变亦可通过MRI清晰显示[30,49]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "谨慎使用"
+        },
+        {
+          "procedure_name_zh": "CT颅脑(平扫)",
+          "procedure_name_en": "CT head without IV contrast",
+          "modality": "CT",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 7,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "对于妊娠期或围产期新发头痛的初步影像学评估，尤其是急性或\"霹雳样\"头痛患者，无静脉造影剂头部CT扫描具有重要价值。针对妊娠期或产后新发霹雳样头痛患者，必须排除蛛网膜下腔出血（SAH）可能——产后即刻阶段SAH发病率会增加20倍[51]。如变异1所述，多项研究证实：在头痛发作6小时内由合格放射科医师判读的头部CT，对动脉瘤性SAH的阴性预测值可达99.9%-100%；24小时内检查的敏感性为90%-100%[16,17]。该人群还面临可逆性脑血管收缩综合征（RCVS）风险增加，对于疑似RCVS病例，无造影剂头部CT特别有助于检测凸面SAH[12]。由于妊娠期高凝状态，此类人群还易发生脑静脉血栓（CVT）——无造影剂头部CT可显示硬脑膜静脉窦内高密度血栓或静脉缺血相关的低密度脑实质水肿，尤其当患者出现局灶性神经功能缺损时更具诊断价值[11]。",
+          "evidence_level": "ModerateReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅内静脉血管成像(MRV)",
+          "procedure_name_en": "MRV head without IV contrast",
+          "modality": "MRI",
+          "body_part": "头部|血管",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "孕期或围产期新发头痛的初步影像学评估中，无静脉造影的头部MRV具有重要价值，因为该人群发生血栓栓塞并发症（如CVT）的风险较高，尤其在产后阶段[12,49]。在完成初步脑部MRI检查后，对于疑似静脉血栓病例，同步或后续MRV检查具有诊断意义。鉴于妊娠期应避免静脉注射钆对比剂，此类检查通常采用非增强技术（如时间飞跃法或相位对比成像）完成。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "CT颅内静脉血管成像(CTV)",
+          "procedure_name_en": "CTV head with IV contrast",
+          "modality": "CT",
+          "body_part": "头部|血管",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 5,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "妊娠期或围产期新发头痛的初步影像学评估中，静脉注射对比剂的CTV头部检查具有重要价值，因为该人群发生血栓栓塞并发症（如CVT）的风险较高，尤其在产后阶段[12,49]。对于需要硬脑膜静脉窦增强评估的孕妇患者，CTV是首选检查方式，因为就潜在胎儿影响而言，碘对比剂通常被认为比钆基对比剂（GBCA）更安全。在初步头部CT检查后，对疑似静脉血栓病例进行同步或后续CTV检查具有诊断意义。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "安全"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0816",
+      "scenario_description": "急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。",
+      "description_zh": "急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": "急诊",
+      "panel_name": "神经内科",
+      "topic_name": "头部创伤",
+      "recommendations": [
+        {
+          "procedure_name_zh": "CT颅脑(平扫)",
+          "procedure_name_en": "CT head without IV contrast",
+          "modality": "CT",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 9,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "对于伴有新发或进行性神经功能缺损的急性头部创伤患者，当需要进行短期随访影像检查时，无静脉造影剂头部CT检查通常是合适的。这种非增强检查是评估创伤环境下潜在并发症（如 evolving hemorrhage、脑水肿、占位效应或脑疝）的主要方式。它能够快速评估脑实质损伤、脑室大小和颅骨完整性，且无需承担静脉造影剂相关的风险。该检查对于监测已知创伤性病变的间隔变化或评估临床恶化特别有价值。局限性包括对某些非出血性轴索损伤或非常小的挫伤 compared to MRI 的敏感性降低。进行随访影像检查的决定应基于临床评估，同时考虑患者的稳定性和具体神经功能检查结果。",
+          "evidence_level": "StrongReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "谨慎使用"
+        },
+        {
+          "procedure_name_zh": "MR颅脑(平扫)",
+          "procedure_name_en": "MRI Head Without IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "对于急性头部创伤伴有新发或进行性神经功能缺损的患者，无静脉注射造影剂的头部MRI可能适用于短期随访成像。与CT相比，该模态提供更优异的软组织特征显示，能更好地评估 evolving 的创伤性颅内损伤，如弥漫性轴索损伤、小挫伤或初始成像可能未完全显示的细微实质病变。当临床症状与CT结果不成比例或出现神经功能恶化时，MRI尤其有价值。然而，MRI存在局限性，包括采集时间较长、急诊环境下可用性有限、对急性出血的敏感性较CT降低，以及对某些金属植入物或设备患者的禁忌症。使用MRI的决定应基于个体患者因素、临床轨迹和机构能力，同时认识到CT仍然是急性头部创伤评估的主要初始成像模态。",
+          "evidence_level": "StrongReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "禁忌"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0823",
+      "scenario_description": "原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。",
+      "description_zh": "原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "MR颅脑(平扫+增强)",
+          "procedure_name_en": "MRI Head Without and With IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 8,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "头部MRI平扫+增强是TACs初步影像学评估最常用的推荐方法，有助于排除鞍区或后颅窝占位引起的继发性头痛。结构性病变（尤其是垂体来源）仍是TACs最常见的继发性病因，特别是丛集性头痛。此外，后颅窝病变也可能表现出类似TACs的症状。包含鞍区专项扫描的脑部MRI可有效排除垂体源性TACs。常规脑部MRI还能鉴别其他结构性病变（如颅内肿瘤[脑膜瘤]和动静脉畸形等TACs鉴别诊断中的疾病）[30,31,33,34]。平衡稳态自由进动序列可作为TACs结构分析的一部分，用于评估三叉神经的潜在占位效应。伴结膜充血和流泪的短暂单侧神经痛样头痛发作与V1三叉神经痛较难鉴别，脑干和颅神经的高分辨率专项成像也有助于评估三叉神经受压或其他病变[34]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0825",
+      "scenario_description": "具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查",
+      "description_zh": "具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "MR颅脑(平扫+增强)",
+          "procedure_name_en": "MRI Head Without and With IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 9,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "不注射及注射静脉对比剂的头部MRI有助于对具有颅内低压特征的头痛进行初步影像学评估。最常见的脑部MRI表现包括硬脑膜强化（83%患者可见）、硬膜下积液、脑组织/脑干下沉、小脑扁桃体下移、静脉结构/静脉窦扩张以及垂体增大。眼部表现包括视神经鞘塌陷和视神经角度变直。需注意的是，与特发性颅内高压（IIH）或颅内高压的表现相反，静脉窦、垂体及视神经鞘的影像学改变符合预期。同时必须强调，这些影像学表现需结合体位性头痛的相应临床背景进行解读，因为其他疾病也可能出现重叠的影像学表现：如Chiari 1型畸形可见小脑扁桃体下移、外伤可致硬膜下积液、免疫球蛋白G4相关疾病及神经结节病等炎症性疾病可导致弥漫性硬脑膜增厚[43-45]。",
+          "evidence_level": "Expert Consensus",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR胸椎(平扫+增强)",
+          "procedure_name_en": "MRI Thoracic Spine Without and With IV Contrast",
+          "modality": "MRI",
+          "body_part": "胸部|脊柱",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 5,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "虽然脊柱成像的主要目的是寻找与硬膜撕裂相符的硬膜外积液（无需造影剂），但在某些情况下进行脊柱造影后成像是合理的，例如在进行同步脑部MRI检查时使用造影剂，或需要区分强化的硬膜外静脉扩张与非强化的硬膜外积液时。",
+          "evidence_level": "Expert Consensus",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR胸椎(平扫)",
+          "procedure_name_en": "MRI Thoracic Spine Without IV Contrast",
+          "modality": "MRI",
+          "body_part": "胸部|脊柱",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 5,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "无静脉注射对比剂的脊柱MRI在伴有颅内低压特征的头痛的初始影像学评估中具有应用价值。其主要目的是探查椎管内硬膜外积液（通常位于胸椎水平），这些表现与硬膜撕裂（1型或2型脑脊液漏）相符。识别此类积液有助于指导进一步治疗，或在脑部MRI表现正常的情况下确诊自发性颅内低压（SIH）。SIH的其他脊柱MRI表现包括硬脊膜强化、硬膜外静脉扩张以及神经根袖异常显影。虽然部分脊柱脑脊液漏患者可通过平卧休息和/或非靶向腰椎硬膜外血贴治疗获得缓解，但其他患者可能表现为难治性症状，需要精确定位脊柱脑脊液漏以进行靶向治疗。重T2加权MR脊髓成像无需鞘内注射对比剂，是一种新兴的无创技术，可检测脑脊液漏且避免腰椎穿刺和辐射暴露。该技术也可用于指导靶向硬膜外血贴治疗。韩国一项研究采用重T2加权MR脊髓成像替代CT脊髓成像检测低脑脊液压力，结果显示80.8%的患者检测到脑脊液漏。基于重T2加权MR脊髓成像结果规划硬膜外血贴放置方案，在使用该技术检测到脑脊液漏的患者中，82.4%实现了症状完全缓解[46]。脊柱脑脊液漏定位的微创方法包括常规CT脊髓成像、动态CT脊髓成像、数字减影脊髓成像以及鞘内注射对比剂的MR脊髓成像。因此，这些技术适用于对非靶向治疗无效的伴有颅内低压特征的头痛患者的随访影像学评估。脊柱脑脊液漏定位技术的选择可能取决于疑似脑脊液漏类型（硬膜撕裂与远端神经根袖漏）以及不同机构的偏好。虽然放射性核素脑池显像在某些情况下可用于确认脊柱脑脊液漏的存在，但其空间分辨率不足难以实现精确漏点定位。",
+          "evidence_level": "Expert Consensus",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR胸椎(增强)",
+          "procedure_name_en": "MRI Thoracic Spine With IV Contrast",
+          "modality": "MRI",
+          "body_part": "胸部|脊柱",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 5,
+          "appropriateness_category_zh": "可能适宜（存在争议）",
+          "reasoning_zh": "虽然脊柱成像的主要目的是寻找与硬膜撕裂相符的硬膜外积液（无需造影剂），但在某些情况下进行脊柱造影后成像是合理的，例如在进行同步脑部MRI检查时使用造影剂，或需要区分强化的硬膜外静脉扩张与非强化的硬膜外积液时。",
+          "evidence_level": "Expert Opinion",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0824",
+      "scenario_description": "具有颅内高压特征的头痛（如视乳头水肿、搏动性耳鸣、Valsalva动作加重视觉症状）初始影像学检查",
+      "description_zh": "具有颅内高压特征的头痛（如视乳头水肿、搏动性耳鸣、Valsalva动作加重视觉症状）初始影像学检查",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": null,
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "MR颅脑(平扫+增强)",
+          "procedure_name_en": "MRI Head Without and With IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 8,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "脑部磁共振成像（MRI）有助于检测与原发性特发性颅内压增高（IIH）相关的影像学征象，并协助排除颅内压升高的继发性病因，包括占位性病变、水肿或脑积水等结构性异常[37]。虽然无需静脉注射造影剂即可观察与IIH或占位/脑积水相关的结构改变，但造影剂有助于颅内占位性病变的特征分析及静脉窦显影。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "CT颅脑(平扫)",
+          "procedure_name_en": "CT head without IV contrast",
+          "modality": "CT",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 7,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "无静脉注射对比剂的头部CT可用于初步评估伴有颅内高压特征的头痛。视乳头水肿是颅内压升高的标志之一，已被证实是预测影像学异常（包括结构性病变）的重要“警示信号”。非增强头部CT有助于迅速排查颅内高压的继发性病因，如占位性病变、脑水肿或脑积水[37]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅脑(平扫)",
+          "procedure_name_en": "MRI Head Without IV Contrast",
+          "modality": "MRI",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 7,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "不注射静脉造影剂的头部MRI可用于初步评估具有颅内高压特征的头痛。例如，脑部MRI可评估导致颅内压升高的继发性原因，包括结构性异常如肿块、水肿或脑积水。此外，脑部MRI还能检测文献中描述的与原发性特发性颅内高压（IIH）相关的细微表现。根据2011年一项针对颅内压升高患者的研究，IIH患者中更常见6种征象：部分空蝶鞍、垂体柄后移、眼球后部扁平化、视神经乳头突出、视神经鞘扩张及视神经鞘迂曲。其中三种征象对IIH具有高度特异性：部分空蝶鞍、眼球后部扁平化和视神经乳头突出[35,41]。小规模研究表明，视神经鞘和垂体半自动容积评估对辅助诊断IIH具有潜在价值[42]。",
+          "evidence_level": "StrongReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "CT颅内静脉血管成像(CTV)",
+          "procedure_name_en": "CTV head with IV contrast",
+          "modality": "CT",
+          "body_part": "头部|血管",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "关于IIH的病理生理学理论包括静脉流出道梗阻导致颅内压增高，以及疑似IIH患者和慢性头痛患者中存在静脉窦狭窄或血栓形成，这强化了静脉成像在不明原因头痛中的价值，尤其当存在颅内高压特征时[3840]。多项研究也证实，与时间飞跃法MRI技术相比，采用静脉注射对比剂的CTV具有更高的应用价值[36,38]。",
+          "evidence_level": "StrongReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅内静脉血管增强成像(CE-MRV)",
+          "procedure_name_en": "MRV head with IV contrast",
+          "modality": "MRI",
+          "body_part": "头部|血管",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "研究表明，静脉流出道阻塞（无论由腔内血栓还是外源性狭窄引起）与颅内压升高及特发性颅内高压（IIH）相关。因此，在评估具有颅内高压特征的头痛时，脑部磁共振静脉成像（MRV）可作为影像学检查手段。选择非增强（如时间飞跃法或相位对比法）还是增强技术可能取决于不同机构的偏好。静脉注射造影剂有助于清晰显示静脉窦管腔，并避免非增强MRV技术中常见的血流相关伪影，后者更易导致误判[36,38]。因此，解读非增强脑MRV时需注意可能与血流缓慢或湍流相关的伪影，并建议结合已完成的脑部MRI结果进行综合分析。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅内静脉血管平扫+增强(MRV+CE-MRV)",
+          "procedure_name_en": "MRV head without and with IV contrast",
+          "modality": "MRI",
+          "body_part": "头部|血管",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "管腔内血栓或外源性狭窄所致的静脉流出道梗阻已被证实与颅内压升高及特发性颅内高压（IIH）相关；因此，在具有颅内高压特征的头痛影像学评估中，脑部MRV等静脉成像技术具有应用价值。选择非增强技术（如时间飞跃法或相位对比法）还是增强技术可能取决于不同机构的偏好。静脉注射对比剂有助于清晰勾勒静脉窦管腔，并避免部分流动伪影。因此，解读非增强脑部MRV时需注意可能存在与缓慢或湍流相关的伪影，并建议结合既往脑部MRI结果进行综合判断。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "MR颅内静脉血管成像(MRV)",
+          "procedure_name_en": "MRV head without IV contrast",
+          "modality": "MRI",
+          "body_part": "头部|血管",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "研究表明，静脉流出道阻塞（无论由腔内血栓还是外源性狭窄引起）与颅内压升高及特发性颅内高压（IIH）相关。因此，在评估具有颅内高压特征的头痛时，脑部磁共振静脉成像（MRV）可作为影像学检查手段。选择非增强（如时间飞跃法或相位对比法）还是增强技术可能取决于不同机构的偏好。静脉注射造影剂有助于清晰显示静脉窦管腔，并避免非增强MRV技术中常见的血流相关伪影，后者更易导致误判[36,38]。因此，解读非增强脑MRV时需注意可能与血流缓慢或湍流相关的伪影，并建议结合已完成的脑部MRI结果进行综合分析。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        }
+      ]
+    },
+    {
+      "scenario_id": "S0821",
+      "scenario_description": "突发严重头痛且1小时内达最高强度。初始影像学检查。",
+      "description_zh": "突发严重头痛且1小时内达最高强度。初始影像学检查。",
+      "patient_population": null,
+      "risk_level": null,
+      "age_group": null,
+      "gender": null,
+      "urgency_level": "急诊",
+      "panel_name": "神经内科",
+      "topic_name": "头痛",
+      "recommendations": [
+        {
+          "procedure_name_zh": "CT颅脑(平扫)",
+          "procedure_name_en": "CT head without IV contrast",
+          "modality": "CT",
+          "body_part": "头部",
+          "contrast_used": false,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 9,
+          "appropriateness_category_zh": "通常适宜",
+          "reasoning_zh": "头部CT平扫在雷击样头痛（TCH）评估中具有重要价值，因其对颅内出血检测的高敏感性。多项研究表明，头痛发作6小时内进行的头部CT平扫对动脉瘤性蛛网膜下腔出血（SAH）的阴性预测值高达99.9%-100%。若在24小时内检查，其敏感性可达90%-100%[16,17]。10%的脑静脉血栓（CVT）患者会表现为SAH；相关CT异常包括静脉性梗死、脑实质水肿或闭塞静脉窦内的高密度血栓。虽然SAH在动静脉畸形（AVM）破裂中较少见，但CT平扫可显示脑叶出血及代表扩张血管的蜿蜒状结构[11]。此外，当与平扫CT联合应用时（非单独作为初始影像学检查），增强CT血管造影（CTA）可能具有辅助诊断价值。有文献支持对TCH患者同期进行CT平扫与CTA检查，尤其当患者突发剧烈头痛超过6小时就诊时，因随时间推移CT对SAH的敏感性会降低。对于疑似可逆性脑血管收缩综合征（RCVS）病例，需特别关注凸面SAH的CT平扫检查已被证实具有诊断意义[12]。",
+          "evidence_level": "ModerateReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        },
+        {
+          "procedure_name_zh": "CT颅内动脉血管成像(CTA)",
+          "procedure_name_en": "CTA head with IV contrast",
+          "modality": "CT",
+          "body_part": "头部|血管",
+          "contrast_used": true,
+          "radiation_level": null,
+          "exam_duration": null,
+          "preparation_required": false,
+          "appropriateness_rating": 6,
+          "appropriateness_category_zh": "可能适宜",
+          "reasoning_zh": "在TCH（霹雳样头痛）情况下，当与非增强头颅CT联合使用时（而非作为独立的初始影像学检查），静脉注射对比剂的头颅CTA可能具有应用价值。现有文献支持在TCH患者进行头颅CT检查时同期实施头颅CTA的效用，特别是当患者出现突发剧烈头痛超过6小时时，因为头颅CT对蛛网膜下腔出血的敏感性会随时间推移而降低。例如，对于疑似颅内动脉瘤（破裂或未破裂）、动脉夹层及可逆性脑血管收缩综合征的病例，同期或后续CTA检查具有诊断价值[10-12,18]。",
+          "evidence_level": "LimitedReferences",
+          "contraindications": null,
+          "special_considerations": null,
+          "pregnancy_safety": "未评估"
+        }
+      ]
+    }
+  ],
+  "processing_time_ms": 8321,
+  "model_used": "Qwen/Qwen2.5-32B-Instruct",
+  "similarity_threshold": 0.6,
+  "max_similarity": 0.6261490173980371,
+  "is_low_similarity_mode": false,
+  "llm_raw_response": "{\n    \"recommendations\": [\n        {\n            \"rank\": 1,\n            \"procedure_name\": \"MR颅脑(平扫+增强)\",\n            \"modality\": \"MRI\",\n            \"appropriateness_rating\": \"9/9\",\n            \"recommendation_reason\": \"头部MRI平扫+增强扫描可用于伴有上述一项或多项“危险信号”头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。\",\n            \"clinical_considerations\": \"鉴于患者出现左侧肢体无力和新发头痛，且年龄为50岁，存在神经功能缺损的警示征象，MRI平扫+增强有助于全面评估颅内情况。\"\n        },\n        {\n            \"rank\": 2,\n            \"procedure_name\": \"CT颅脑(平扫)\",\n            \"modality\": \"CT\",\n            \"appropriateness_rating\": \"7/9\",\n            \"recommendation_reason\": \"不注射静脉造影剂的头部CT可用于伴有以下一种或多种“警示征象”的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。\",\n            \"clinical_considerations\": \"CT检查快速，适用于急性情况下排除颅内出血等紧急情况。\"\n        },\n        {\n            \"rank\": 3,\n            \"procedure_name\": \"MR颅脑(平扫)\",\n            \"modality\": \"MRI\",\n            \"appropriateness_rating\": \"7/9\",\n            \"recommendation_reason\": \"不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\\\"警示征象\\\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。\",\n            \"clinical_considerations\": \"MRI具有更高的软组织分辨率，适用于非急性情况下进一步评估颅内结构。\"\n        }\n    ],\n    \"summary\": \"推荐使用MRI平扫+增强作为首选检查，CT平扫作为快速排除颅内出血的备选，MRI平扫用于进一步评估。\",\n    \"no_rag\": false\n}",
+  "debug_info": {
+    "step_1_query": "50岁女性，3天前开始出现左侧肢体无力，伴新发头痛。",
+    "step_2_vector_generation": {
+      "vector_dimension": 1024,
+      "vector_sample": [
+        -0.014697027,
+        0.027990773,
+        -0.044979826,
+        -0.02413643,
+        -0.03380971
+      ]
+    },
+    "rules_audit": {
+      "rerank": [],
+      "post": []
+    },
+    "step_3_scenarios_search": {
+      "found_scenarios": 8,
+      "scenarios": [
+        {
+          "id": "S0827",
+          "similarity": 0.6261490173980371,
+          "description": "伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较..."
+        },
+        {
+          "id": "S0828",
+          "similarity": 0.5849629814911842,
+          "description": "不伴以下“警示征”的头痛：突发性（霹雳样）、颅内压增高或降低特征、妊娠期或围产期新发或模式改变、频率..."
+        },
+        {
+          "id": "S0826",
+          "similarity": 0.5530783432494135,
+          "description": "妊娠期或围产期新发或模式改变头痛 初始影像学检查..."
+        },
+        {
+          "id": "S0816",
+          "similarity": 0.5523293512162009,
+          "description": "急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。..."
+        },
+        {
+          "id": "S0823",
+          "similarity": 0.554996983855879,
+          "description": "原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。..."
+        },
+        {
+          "id": "S0825",
+          "similarity": 0.5705194303238685,
+          "description": "具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查..."
+        },
+        {
+          "id": "S0824",
+          "similarity": 0.5648148564828827,
+          "description": "具有颅内高压特征的头痛（如视乳头水肿、搏动性耳鸣、Valsalva动作加重视觉症状）初始影像学检查..."
+        },
+        {
+          "id": "S0821",
+          "similarity": 0.5551385183756241,
+          "description": "突发严重头痛且1小时内达最高强度。初始影像学检查。..."
+        }
+      ]
+    },
+    "step_3_recall_topk": 8,
+    "step_3_targets": {
+      "panels": [
+        "放射科",
+        "神经内科",
+        "神经外科"
+      ],
+      "topics": [
+        "短暂性脑缺血",
+        "脑卒中",
+        "颅脑影像",
+        "头痛"
+      ]
+    },
+    "step_3_boosts": {
+      "panel_boost": 0.1,
+      "topic_boost": 0.2,
+      "keyword_boost": 0.05
+    },
+    "step_4_similarity_check": {
+      "max_similarity": 0.6261490173980371,
+      "threshold": 0.6,
+      "is_low_similarity": false,
+      "similarity_status": "high"
+    },
+    "step_5_mode": "rag",
+    "step_5_scenarios_with_recs": {
+      "scenarios_count": 7,
+      "total_recommendations": 23,
+      "scenarios_summary": [
+        {
+          "id": "S0827",
+          "description": "伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较...",
+          "recommendations_count": 3
+        },
+        {
+          "id": "S0826",
+          "description": "妊娠期或围产期新发或模式改变头痛 初始影像学检查...",
+          "recommendations_count": 4
+        },
+        {
+          "id": "S0816",
+          "description": "急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。...",
+          "recommendations_count": 2
+        },
+        {
+          "id": "S0823",
+          "description": "原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。...",
+          "recommendations_count": 1
+        },
+        {
+          "id": "S0825",
+          "description": "具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查...",
+          "recommendations_count": 4
+        },
+        {
+          "id": "S0824",
+          "description": "具有颅内高压特征的头痛（如视乳头水肿、搏动性耳鸣、Valsalva动作加重视觉症状）初始影像学检查...",
+          "recommendations_count": 7
+        },
+        {
+          "id": "S0821",
+          "description": "突发严重头痛且1小时内达最高强度。初始影像学检查。...",
+          "recommendations_count": 2
+        }
+      ]
+    },
+    "step_6_prompt_length": 4923,
+    "step_6_prompt_preview": "\n你是放射科医生，根据临床场景推荐最合适的影像检查项目。\n\n**患者查询**: \"50岁女性，3天前开始出现左侧肢体无力，伴新发头痛。\"\n\n**相似度**:\n   场景1: 0.626\n   场景2: 0.585\n   场景3: 0.553\n   场景4: 0.552\n   场景5: 0.555\n\n\n\n## 场景 1: S0827\n**描述**: 伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较大（50岁）或创伤后发病 初始影像学检查\n**科室**: 神经内科\n**主题**: 头痛\n\n### 推荐检查:\n\n1. **MR颅脑(平扫+增强)** (MRI)\n   - 评分: 9/9 (通常适宜)\n   - 理由: 头部MRI平扫+增强扫描可用于伴有上述一项或多项“危险信号”头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。探讨“危险信号”作为神经影像学检查指征的文献认为，CT和MRI均可作为合适的初始检查方案。目前尚无具体数据支持哪种影像学检查更具优势，尤其是考虑到潜在病因的广泛性。鉴于MRI较CT具有更高的软组织分辨率，...",
+    "step_7_llm_response_length": 1186,
+    "step_8_parsing_success": true,
+    "step_9_total_time_ms": 8321
+  },
+  "trace": {
+    "recall_scenarios": [
+      {
+        "id": "S0827",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.6261490173980371
+      },
+      {
+        "id": "S0828",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5849629814911842
+      },
+      {
+        "id": "S0826",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5530783432494135
+      },
+      {
+        "id": "S0816",
+        "panel": "神经内科",
+        "topic": "头部创伤",
+        "similarity": 0.5523293512162009
+      },
+      {
+        "id": "S0823",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.554996983855879
+      },
+      {
+        "id": "S0825",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5705194303238685
+      },
+      {
+        "id": "S0824",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5648148564828827
+      },
+      {
+        "id": "S0821",
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5551385183756241
+      }
+    ],
+    "rerank_scenarios": [
+      {
+        "id": "S0827",
+        "_rerank_score": 0.50038886,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.6261490173980371
+      },
+      {
+        "id": "S0828",
+        "_rerank_score": 0.3339375,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5849629814911842
+      },
+      {
+        "id": "S0826",
+        "_rerank_score": 0.08195955,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5530783432494135
+      },
+      {
+        "id": "S0816",
+        "_rerank_score": 0.060197048,
+        "panel": "神经内科",
+        "topic": "头部创伤",
+        "similarity": 0.5523293512162009
+      },
+      {
+        "id": "S0823",
+        "_rerank_score": 0.055412795,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.554996983855879
+      },
+      {
+        "id": "S0825",
+        "_rerank_score": 0.03803509,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5705194303238685
+      },
+      {
+        "id": "S0824",
+        "_rerank_score": 0.032405518,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5648148564828827
+      },
+      {
+        "id": "S0821",
+        "_rerank_score": 0.032100707,
+        "panel": "神经内科",
+        "topic": "头痛",
+        "similarity": 0.5551385183756241
+      }
+    ],
+    "final_prompt": "\n你是放射科医生，根据临床场景推荐最合适的影像检查项目。\n\n**患者查询**: \"50岁女性，3天前开始出现左侧肢体无力，伴新发头痛。\"\n\n**相似度**:\n   场景1: 0.626\n   场景2: 0.585\n   场景3: 0.553\n   场景4: 0.552\n   场景5: 0.555\n\n\n\n## 场景 1: S0827\n**描述**: 伴以下任一“警示征”的头痛：频率或严重程度增加、发热或神经功能缺损、癌症史或免疫功能低下、发病年龄较大（50岁）或创伤后发病 初始影像学检查\n**科室**: 神经内科\n**主题**: 头痛\n\n### 推荐检查:\n\n1. **MR颅脑(平扫+增强)** (MRI)\n   - 评分: 9/9 (通常适宜)\n   - 理由: 头部MRI平扫+增强扫描可用于伴有上述一项或多项“危险信号”头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。探讨“危险信号”作为神经影像学检查指征的文献认为，CT和MRI均可作为合适的初始检查方案。目前尚无具体数据支持哪种影像学检查更具优势，尤其是考虑到潜在病因的广泛性。鉴于MRI较CT具有更高的软组织分辨率，MRI可能成为首选的初始影像学检查方式，特别是在非急性情况下。多数文献将...\n\n\n2. **CT颅脑(平扫)** (CT)\n   - 评分: 7/9 (通常适宜)\n   - 理由: 不注射静脉造影剂的头部CT可用于伴有以下一种或多种“警示征象”的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。对于出现急性神经功能缺损或精神状态异常的患者，以及近期有外伤史的患者，头部CT作为初步检查有助于排除颅内出血引起的继发性头痛[55,56]。\n\n\n3. **MR颅脑(平扫)** (MRI)\n   - 评分: 7/9 (通常适宜)\n   - 理由: 不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\"警示征象\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。现有研究\"警示征象\"作为神经影像学检查指征的文献认为，CT和MRI均适合作为初始检查方案。目前尚无明确数据支持某种影像学检查更具优势，尤其考虑到潜在病因的广泛性。鉴于MRI较CT具有更高的软组织分辨率，在非急性情况下，MRI可能更适合作为首选影像学检查方...\n\n\n## 场景 2: S0826\n**描述**: 妊娠期或围产期新发或模式改变头痛 初始影像学检查\n**科室**: 神经内科\n**主题**: 头痛\n\n### 推荐检查:\n\n1. **MR颅脑(平扫)** (MRI)\n   - 评分: 8/9 (通常适宜)\n   - 理由: 孕期或围产期新发头痛的初步影像学评估中，不注射静脉对比剂的头部MRI具有重要价值。妊娠期继发性头痛病因多样，包括：1. 雷击样头痛需排查动脉病变（如动脉瘤性蛛网膜下腔出血或可逆性脑血管收缩综合征），尤其产后患者（参见变异型1）；2. 结构性病变包括颅内肿瘤及垂体源性病变；3. 肥胖女性需特别考虑特发性颅内压增高（参见变异型4）；4. 子痫前期/子痫作为妊娠特发性疾病，可出现头痛伴后部可逆性脑病综合...\n\n\n2. **CT颅脑(平扫)** (CT)\n   - 评分: 7/9 (通常适宜)\n   - 理由: 对于妊娠期或围产期新发头痛的初步影像学评估，尤其是急性或\"霹雳样\"头痛患者，无静脉造影剂头部CT扫描具有重要价值。针对妊娠期或产后新发霹雳样头痛患者，必须排除蛛网膜下腔出血（SAH）可能——产后即刻阶段SAH发病率会增加20倍[51]。如变异1所述，多项研究证实：在头痛发作6小时内由合格放射科医师判读的头部CT，对动脉瘤性SAH的阴性预测值可达99.9%-100%；24小时内检查的敏感性为90%-...\n\n\n3. **MR颅内静脉血管成像(MRV)** (MRI)\n   - 评分: 6/9 (可能适宜)\n   - 理由: 孕期或围产期新发头痛的初步影像学评估中，无静脉造影的头部MRV具有重要价值，因为该人群发生血栓栓塞并发症（如CVT）的风险较高，尤其在产后阶段[12,49]。在完成初步脑部MRI检查后，对于疑似静脉血栓病例，同步或后续MRV检查具有诊断意义。鉴于妊娠期应避免静脉注射钆对比剂，此类检查通常采用非增强技术（如时间飞跃法或相位对比成像）完成。\n\n\n## 场景 3: S0816\n**描述**: 急性头部创伤伴新发或进展性神经功能缺损，短期随访影像学检查。\n**科室**: 神经内科\n**主题**: 头部创伤\n\n### 推荐检查:\n\n1. **CT颅脑(平扫)** (CT)\n   - 评分: 9/9 (通常适宜)\n   - 理由: 对于伴有新发或进行性神经功能缺损的急性头部创伤患者，当需要进行短期随访影像检查时，无静脉造影剂头部CT检查通常是合适的。这种非增强检查是评估创伤环境下潜在并发症（如 evolving hemorrhage、脑水肿、占位效应或脑疝）的主要方式。它能够快速评估脑实质损伤、脑室大小和颅骨完整性，且无需承担静脉造影剂相关的风险。该检查对于监测已知创伤性病变的间隔变化或评估临床恶化特别有价值。局限性包括对某...\n\n\n2. **MR颅脑(平扫)** (MRI)\n   - 评分: 6/9 (可能适宜)\n   - 理由: 对于急性头部创伤伴有新发或进行性神经功能缺损的患者，无静脉注射造影剂的头部MRI可能适用于短期随访成像。与CT相比，该模态提供更优异的软组织特征显示，能更好地评估 evolving 的创伤性颅内损伤，如弥漫性轴索损伤、小挫伤或初始成像可能未完全显示的细微实质病变。当临床症状与CT结果不成比例或出现神经功能恶化时，MRI尤其有价值。然而，MRI存在局限性，包括采集时间较长、急诊环境下可用性有限、对急...\n\n\n## 场景 4: S0823\n**描述**: 原发性三叉神经自主神经性头痛（如丛集性头痛）。初始影像学检查。\n**科室**: 神经内科\n**主题**: 头痛\n\n### 推荐检查:\n\n1. **MR颅脑(平扫+增强)** (MRI)\n   - 评分: 8/9 (通常适宜)\n   - 理由: 头部MRI平扫+增强是TACs初步影像学评估最常用的推荐方法，有助于排除鞍区或后颅窝占位引起的继发性头痛。结构性病变（尤其是垂体来源）仍是TACs最常见的继发性病因，特别是丛集性头痛。此外，后颅窝病变也可能表现出类似TACs的症状。包含鞍区专项扫描的脑部MRI可有效排除垂体源性TACs。常规脑部MRI还能鉴别其他结构性病变（如颅内肿瘤[脑膜瘤]和动静脉畸形等TACs鉴别诊断中的疾病）[30,31,...\n\n\n## 场景 5: S0825\n**描述**: 具有颅内低压特征的头痛（如体位性、直立位加重、平卧缓解）初始影像学检查\n**科室**: 神经内科\n**主题**: 头痛\n\n### 推荐检查:\n\n1. **MR颅脑(平扫+增强)** (MRI)\n   - 评分: 9/9 (通常适宜)\n   - 理由: 不注射及注射静脉对比剂的头部MRI有助于对具有颅内低压特征的头痛进行初步影像学评估。最常见的脑部MRI表现包括硬脑膜强化（83%患者可见）、硬膜下积液、脑组织/脑干下沉、小脑扁桃体下移、静脉结构/静脉窦扩张以及垂体增大。眼部表现包括视神经鞘塌陷和视神经角度变直。需注意的是，与特发性颅内高压（IIH）或颅内高压的表现相反，静脉窦、垂体及视神经鞘的影像学改变符合预期。同时必须强调，这些影像学表现需结合...\n\n\n2. **MR胸椎(平扫+增强)** (MRI)\n   - 评分: 5/9 (可能适宜)\n   - 理由: 虽然脊柱成像的主要目的是寻找与硬膜撕裂相符的硬膜外积液（无需造影剂），但在某些情况下进行脊柱造影后成像是合理的，例如在进行同步脑部MRI检查时使用造影剂，或需要区分强化的硬膜外静脉扩张与非强化的硬膜外积液时。\n\n\n3. **MR胸椎(平扫)** (MRI)\n   - 评分: 5/9 (可能适宜)\n   - 理由: 无静脉注射对比剂的脊柱MRI在伴有颅内低压特征的头痛的初始影像学评估中具有应用价值。其主要目的是探查椎管内硬膜外积液（通常位于胸椎水平），这些表现与硬膜撕裂（1型或2型脑脊液漏）相符。识别此类积液有助于指导进一步治疗，或在脑部MRI表现正常的情况下确诊自发性颅内低压（SIH）。SIH的其他脊柱MRI表现包括硬脊膜强化、硬膜外静脉扩张以及神经根袖异常显影。虽然部分脊柱脑脊液漏患者可通过平卧休息和/或...\n\n\n\n基于以上信息，推荐最合适的3个影像检查项目。\n\n\n候选检查（必须从下列候选中选择，不得输出候选之外的检查）：\n1. MR颅脑(平扫+增强) (MRI)\n2. CT颅脑(平扫) (CT)\n3. MR颅脑(平扫) (MRI)\n4. MR颅内静脉血管成像(MRV) (MRI)\n5. CT颅内静脉血管成像(CTV) (CT)\n6. MR胸椎(平扫+增强) (MRI)\n7. MR胸椎(平扫) (MRI)\n8. MR胸椎(增强) (MRI)\n9. MR颅内静脉血管增强成像(CE-MRV) (MRI)\n10. MR颅内静脉血管平扫+增强(MRV+CE-MRV) (MRI)\n11. CT颅内动脉血管成像(CTA) (CT)\n\n\n严格输出要求：\n仅输出有效JSON，不能包含任何解释、Markdown代码块或额外文字\n不要使用```包裹，不要有多余的换行或注释\n字段名必须严格一致；不要多输出未定义字段\nJSON中不允许出现尾随逗号\n必须基于上述上下文与候选进行推荐，并从候选中选择；不得输出候选之外的检查\n对于每个被选择的检查项目，appropriateness_rating 必须与候选/上下文中展示的评分一致，不得改动或臆造；若上下文未提供评分，则省略该字段\n\n输出JSON格式:\n{\n    \"recommendations\": [\n        {\n            \"rank\": 1,\n            \"procedure_name\": \"检查项目名称\",\n            \"modality\": \"检查方式\",\n            \"appropriateness_rating\": \"评分/9\",\n            \"recommendation_reason\": \"推荐理由\",\n            \"clinical_considerations\": \"临床考虑\"\n        },\n        {\n            \"rank\": 2,\n            \"procedure_name\": \"检查项目名称\",\n            \"modality\": \"检查方式\",\n            \"appropriateness_rating\": \"评分/9\",\n            \"recommendation_reason\": \"推荐理由\",\n            \"clinical_considerations\": \"临床考虑\"\n        },\n        {\n            \"rank\": 3,\n            \"procedure_name\": \"检查项目名称\",\n            \"modality\": \"检查方式\",\n            \"appropriateness_rating\": \"评分/9\",\n            \"recommendation_reason\": \"推荐理由\",\n            \"clinical_considerations\": \"临床考虑\"\n        }\n    ],\n    \"summary\": \"推荐总结\",\n    \"no_rag\": false\n}\n",
+    "llm_raw": "{\n    \"recommendations\": [\n        {\n            \"rank\": 1,\n            \"procedure_name\": \"MR颅脑(平扫+增强)\",\n            \"modality\": \"MRI\",\n            \"appropriateness_rating\": \"9/9\",\n            \"recommendation_reason\": \"头部MRI平扫+增强扫描可用于伴有上述一项或多项“危险信号”头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。\",\n            \"clinical_considerations\": \"鉴于患者出现左侧肢体无力和新发头痛，且年龄为50岁，存在神经功能缺损的警示征象，MRI平扫+增强有助于全面评估颅内情况。\"\n        },\n        {\n            \"rank\": 2,\n            \"procedure_name\": \"CT颅脑(平扫)\",\n            \"modality\": \"CT\",\n            \"appropriateness_rating\": \"7/9\",\n            \"recommendation_reason\": \"不注射静脉造影剂的头部CT可用于伴有以下一种或多种“警示征象”的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。\",\n            \"clinical_considerations\": \"CT检查快速，适用于急性情况下排除颅内出血等紧急情况。\"\n        },\n        {\n            \"rank\": 3,\n            \"procedure_name\": \"MR颅脑(平扫)\",\n            \"modality\": \"MRI\",\n            \"appropriateness_rating\": \"7/9\",\n            \"recommendation_reason\": \"不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\\\"警示征象\\\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。\",\n            \"clinical_considerations\": \"MRI具有更高的软组织分辨率，适用于非急性情况下进一步评估颅内结构。\"\n        }\n    ],\n    \"summary\": \"推荐使用MRI平扫+增强作为首选检查，CT平扫作为快速排除颅内出血的备选，MRI平扫用于进一步评估。\",\n    \"no_rag\": false\n}",
+    "llm_parsed": {
+      "recommendations": [
+        {
+          "rank": 1,
+          "procedure_name": "MR颅脑(平扫+增强)",
+          "modality": "MRI",
+          "appropriateness_rating": "9/9",
+          "recommendation_reason": "头部MRI平扫+增强扫描可用于伴有上述一项或多项\"危险信号\"头痛的初步影像学评估，这些信号提示存在颅内神经病变的可能性较高。",
+          "clinical_considerations": "鉴于患者出现左侧肢体无力和新发头痛，且年龄为50岁，存在神经功能缺损的警示征象，MRI平扫+增强有助于全面评估颅内情况。"
+        },
+        {
+          "rank": 2,
+          "procedure_name": "CT颅脑(平扫)",
+          "modality": "CT",
+          "appropriateness_rating": "7/9",
+          "recommendation_reason": "不注射静脉造影剂的头部CT可用于伴有以下一种或多种\"警示征象\"的头痛患者的初步影像学评估，这些征象与颅内神经病理学改变的可能性较高相关。",
+          "clinical_considerations": "CT检查快速，适用于急性情况下排除颅内出血等紧急情况。"
+        },
+        {
+          "rank": 3,
+          "procedure_name": "MR颅脑(平扫)",
+          "modality": "MRI",
+          "appropriateness_rating": "7/9",
+          "recommendation_reason": "不进行静脉注射造影剂的头部MRI检查，对于伴有以下一项或多项\"警示征象\"（提示颅内神经病理学改变可能性较高）的头痛患者，可作为初步影像学评估手段。",
+          "clinical_considerations": "MRI具有更高的软组织分辨率，适用于非急性情况下进一步评估颅内结构。"
+        }
+      ],
+      "summary": "推荐使用MRI平扫+增强作为首选检查，CT平扫作为快速排除颅内出血的备选，MRI平扫用于进一步评估。",
+      "no_rag": false
+    },
+    "ragas_contexts_count": 38,
+    "ragas_error": "No module named 'ragas'"
+  }
+}

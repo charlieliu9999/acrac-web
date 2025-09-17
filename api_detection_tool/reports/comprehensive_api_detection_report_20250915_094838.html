@@ -1,0 +1,505 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACRAC API端点使用情况检测报告</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .header { background: #f4f4f4; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .summary { background: #e8f4f8; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .section { margin-bottom: 30px; }
+        .endpoint { background: #f9f9f9; padding: 10px; margin: 5px 0; border-left: 4px solid #007acc; }
+        .unused { border-left-color: #ff6b6b; }
+        .used { border-left-color: #51cf66; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .recommendations { background: #fff3cd; padding: 15px; border-radius: 5px; }
+        .code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ACRAC API端点使用情况检测报告</h1>
+        <p>生成时间: 2025-09-15T09:48:38.115042</p>
+        <p>项目根目录: /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web</p>
+    </div>
+    
+    <div class="summary">
+        <h2>📊 检测摘要</h2>
+        <table>
+            <tr><td>总API端点数量</td><td>21</td></tr>
+            <tr><td>已使用端点数量</td><td>1</td></tr>
+            <tr><td>未使用端点数量</td><td>20</td></tr>
+            <tr><td>使用率</td><td>4.8%</td></tr>
+            <tr><td>总使用次数</td><td>121</td></tr>
+            <tr><td>前端使用次数</td><td>70</td></tr>
+            <tr><td>后端使用次数</td><td>51</td></tr>
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>🔍 已定义的API端点</h2>
+        <p>共发现 21 个API端点定义</p>
+        <table>
+            <tr><th>方法</th><th>路径</th><th>函数名</th><th>文件位置</th><th>标签</th><th>描述</th></tr>
+        
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/health</span></td>
+                <td>health_check</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:16</td>
+                <td>-</td>
+                <td>系统健康检查</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/statistics</span></td>
+                <td>get_statistics</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:49</td>
+                <td>-</td>
+                <td>获取详细统计信息</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/panels</span></td>
+                <td>list_panels</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:83</td>
+                <td>-</td>
+                <td>列出所有Panels</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/panels/{semantic_id}/topics</span></td>
+                <td>get_topics_by_panel</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:114</td>
+                <td>-</td>
+                <td>获取Panel下的所有Topics</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/topics/{semantic_id}/scenarios</span></td>
+                <td>get_scenarios_by_topic</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:153</td>
+                <td>-</td>
+                <td>获取Topic下的所有临床场景</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/procedures</span></td>
+                <td>list_procedures</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:205</td>
+                <td>-</td>
+                <td>列出检查项目</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/scenarios/{scenario_id}/recommendations</span></td>
+                <td>get_recommendations_for_scenario</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:245</td>
+                <td>-</td>
+                <td>获取场景的所有推荐</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/analytics/modality-distribution</span></td>
+                <td>get_modality_distribution</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:301</td>
+                <td>-</td>
+                <td>获取检查方式分布</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/analytics/rating-distribution</span></td>
+                <td>get_rating_distribution</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:321</td>
+                <td>-</td>
+                <td>获取适宜性评分分布</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/quick/high-rating-recommendations</span></td>
+                <td>get_high_rating_recommendations</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:343</td>
+                <td>-</td>
+                <td>获取高评分推荐</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/quick/procedures-by-modality/{modality}</span></td>
+                <td>get_procedures_by_modality</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:394</td>
+                <td>-</td>
+                <td>按检查方式获取检查项目</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/examples/complete-recommendation</span></td>
+                <td>get_complete_recommendation_example</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:427</td>
+                <td>-</td>
+                <td>获取完整推荐示例</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/search/procedures</span></td>
+                <td>search_procedures_simple</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:490</td>
+                <td>-</td>
+                <td>简单的检查项目搜索</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">GET</span></td>
+                <td><span class="code">/search/recommendations</span></td>
+                <td>search_recommendations_simple</td>
+                <td>backend/app/api/api_v1/endpoints/acrac_simple.py:538</td>
+                <td>-</td>
+                <td>简单的推荐搜索</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/vector-method</span></td>
+                <td>vector_method_recommendation</td>
+                <td>backend/app/api/api_v1/endpoints/three_methods_api.py:53</td>
+                <td>-</td>
+                <td>方法1：向量检索推荐
+
+使用纯向量相似度搜索，基于患者描述找到最相似的临床推荐
+- 优点：响应快速，...</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/llm-method</span></td>
+                <td>llm_method_recommendation</td>
+                <td>backend/app/api/api_v1/endpoints/three_methods_api.py:118</td>
+                <td>-</td>
+                <td>方法2：LLM分析推荐
+
+使用纯LLM进行临床推理分析，基于医学知识给出推荐
+- 优点：临床推理能力...</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/rag-method</span></td>
+                <td>rag_method_recommendation</td>
+                <td>backend/app/api/api_v1/endpoints/three_methods_api.py:181</td>
+                <td>-</td>
+                <td>方法3：RAG混合推荐
+
+使用向量检索+LLM分析的混合方法，结合两种方法的优势
+- 优点：既有语义...</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/compare-all-methods</span></td>
+                <td>compare_all_methods</td>
+                <td>backend/app/api/api_v1/endpoints/three_methods_api.py:244</td>
+                <td>-</td>
+                <td>对比三种推荐方法
+
+同时调用三种方法，返回对比结果</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/analyze-case</span></td>
+                <td>analyze_clinical_case</td>
+                <td>backend/app/api/api_v1/endpoints/intelligent_analysis.py:61</td>
+                <td>-</td>
+                <td>智能临床案例分析
+
+使用三层混合推荐架构：
+1. 向量检索：基于语义相似度召回相关推荐
+2. 规则过...</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/quick-analysis</span></td>
+                <td>quick_clinical_analysis</td>
+                <td>backend/app/api/api_v1/endpoints/intelligent_analysis.py:101</td>
+                <td>-</td>
+                <td>快速临床分析 - 简化版本</td>
+            </tr>
+            
+            <tr>
+                <td><span class="code">POST</span></td>
+                <td><span class="code">/compare-methods</span></td>
+                <td>compare_recommendation_methods</td>
+                <td>backend/app/api/api_v1/endpoints/intelligent_analysis.py:156</td>
+                <td>-</td>
+                <td>比较不同推荐方法的结果</td>
+            </tr>
+            
+        </table>
+    </div>
+    
+    <div class="section">
+        <h2>⚠️ 未使用的API端点</h2>
+        <p>以下端点定义但未被使用，建议检查是否需要删除或添加使用</p>
+        
+            <div class="endpoint unused">
+                <strong>GET /health</strong><br>
+                函数: health_check<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:16<br>
+                描述: 系统健康检查
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /statistics</strong><br>
+                函数: get_statistics<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:49<br>
+                描述: 获取详细统计信息
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /panels/{semantic_id}/topics</strong><br>
+                函数: get_topics_by_panel<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:114<br>
+                描述: 获取Panel下的所有Topics
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /topics/{semantic_id}/scenarios</strong><br>
+                函数: get_scenarios_by_topic<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:153<br>
+                描述: 获取Topic下的所有临床场景
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /procedures</strong><br>
+                函数: list_procedures<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:205<br>
+                描述: 列出检查项目
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /scenarios/{scenario_id}/recommendations</strong><br>
+                函数: get_recommendations_for_scenario<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:245<br>
+                描述: 获取场景的所有推荐
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /analytics/modality-distribution</strong><br>
+                函数: get_modality_distribution<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:301<br>
+                描述: 获取检查方式分布
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /analytics/rating-distribution</strong><br>
+                函数: get_rating_distribution<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:321<br>
+                描述: 获取适宜性评分分布
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /quick/high-rating-recommendations</strong><br>
+                函数: get_high_rating_recommendations<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:343<br>
+                描述: 获取高评分推荐
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /quick/procedures-by-modality/{modality}</strong><br>
+                函数: get_procedures_by_modality<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:394<br>
+                描述: 按检查方式获取检查项目
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /examples/complete-recommendation</strong><br>
+                函数: get_complete_recommendation_example<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:427<br>
+                描述: 获取完整推荐示例
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /search/procedures</strong><br>
+                函数: search_procedures_simple<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:490<br>
+                描述: 简单的检查项目搜索
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>GET /search/recommendations</strong><br>
+                函数: search_recommendations_simple<br>
+                文件: backend/app/api/api_v1/endpoints/acrac_simple.py:538<br>
+                描述: 简单的推荐搜索
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /vector-method</strong><br>
+                函数: vector_method_recommendation<br>
+                文件: backend/app/api/api_v1/endpoints/three_methods_api.py:53<br>
+                描述: 方法1：向量检索推荐
+
+使用纯向量相似度搜索，基于患者描述找到最相似的临床推荐
+- 优点：响应快速，基于语义相似度
+- 缺点：缺乏临床推理，可能不够个性化
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /llm-method</strong><br>
+                函数: llm_method_recommendation<br>
+                文件: backend/app/api/api_v1/endpoints/three_methods_api.py:118<br>
+                描述: 方法2：LLM分析推荐
+
+使用纯LLM进行临床推理分析，基于医学知识给出推荐
+- 优点：临床推理能力强，个性化程度高
+- 缺点：响应较慢，需要LLM服务支持
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /rag-method</strong><br>
+                函数: rag_method_recommendation<br>
+                文件: backend/app/api/api_v1/endpoints/three_methods_api.py:181<br>
+                描述: 方法3：RAG混合推荐
+
+使用向量检索+LLM分析的混合方法，结合两种方法的优势
+- 优点：既有语义检索的快速性，又有LLM的推理能力
+- 缺点：响应时间介于两者之间
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /compare-all-methods</strong><br>
+                函数: compare_all_methods<br>
+                文件: backend/app/api/api_v1/endpoints/three_methods_api.py:244<br>
+                描述: 对比三种推荐方法
+
+同时调用三种方法，返回对比结果
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /analyze-case</strong><br>
+                函数: analyze_clinical_case<br>
+                文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:61<br>
+                描述: 智能临床案例分析
+
+使用三层混合推荐架构：
+1. 向量检索：基于语义相似度召回相关推荐
+2. 规则过滤：基于医疗规则和患者特征过滤
+3. LLM分析：智能临床推理和个性化推荐
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /quick-analysis</strong><br>
+                函数: quick_clinical_analysis<br>
+                文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:101<br>
+                描述: 快速临床分析 - 简化版本
+            </div>
+            
+            <div class="endpoint unused">
+                <strong>POST /compare-methods</strong><br>
+                函数: compare_recommendation_methods<br>
+                文件: backend/app/api/api_v1/endpoints/intelligent_analysis.py:156<br>
+                描述: 比较不同推荐方法的结果
+            </div>
+            
+    </div>
+    
+    <div class="section">
+        <h2>❓ 未定义的使用</h2>
+        <p>以下API调用未找到对应的端点定义，可能是外部API或动态路径</p>
+        
+            <div class="endpoint">
+                <strong>GET ./api/http</strong><br>
+                文件: frontend/src/App.tsx:11<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">import { api } from './api/http'</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET /api/v1/acrac/rag-llm/rules-config</strong><br>
+                文件: frontend/src/App.tsx:35<br>
+                类型: frontend_axios<br>
+                上下文: <span class="code">api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET /api/v1/acrac/rag-llm/rules-config</strong><br>
+                文件: frontend/src/App.tsx:35<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">api.get('/api/v1/acrac/rag-llm/rules-config').then(res => {</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>POST /api/v1/acrac/rag-llm/rules-config</strong><br>
+                文件: frontend/src/App.tsx:43<br>
+                类型: frontend_axios<br>
+                上下文: <span class="code">const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET /api/v1/acrac/rag-llm/rules-config</strong><br>
+                文件: frontend/src/App.tsx:43<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">const res = await api.post('/api/v1/acrac/rag-llm/rules-config', {</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET ../api/http</strong><br>
+                文件: frontend/src/pages/DataImport.tsx:3<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">import { api } from '../api/http'</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>POST /api/v1/admin/data/upload</strong><br>
+                文件: frontend/src/pages/DataImport.tsx:19<br>
+                类型: frontend_axios<br>
+                上下文: <span class="code">const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET /api/v1/admin/data/upload</strong><br>
+                文件: frontend/src/pages/DataImport.tsx:19<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>POST /api/v1/admin/data/import</strong><br>
+                文件: frontend/src/pages/DataImport.tsx:34<br>
+                类型: frontend_axios<br>
+                上下文: <span class="code">const r = await api.post('/api/v1/admin/data/import', {</span>
+            </div>
+            
+            <div class="endpoint">
+                <strong>GET /api/v1/admin/data/import</strong><br>
+                文件: frontend/src/pages/DataImport.tsx:34<br>
+                类型: frontend_string_literal<br>
+                上下文: <span class="code">const r = await api.post('/api/v1/admin/data/import', {</span>
+            </div>
+            
+    </div>
+    
+    <div class="recommendations">
+        <h2>💡 建议</h2>
+        <ul>
+        <li>发现 20 个未使用的API端点，建议检查是否需要删除或添加使用</li><li>  - GET /health (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:16)</li><li>  - GET /statistics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:49)</li><li>  - GET /panels/{semantic_id}/topics (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:114)</li><li>  - GET /topics/{semantic_id}/scenarios (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:153)</li><li>  - GET /procedures (定义在 backend/app/api/api_v1/endpoints/acrac_simple.py:205)</li><li>发现 121 个未定义的API使用，建议检查是否为外部API或需要添加定义</li><li>  - GET ./api/http (使用在 frontend/src/App.tsx:11)</li><li>  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)</li><li>  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:35)</li><li>  - POST /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)</li><li>  - GET /api/v1/acrac/rag-llm/rules-config (使用在 frontend/src/App.tsx:43)</li><li>API使用率较低 (4.8%)，建议检查是否有冗余的端点</li>
+        </ul>
+    </div>
+</body>
+</html>
+        
