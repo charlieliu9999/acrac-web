@@ -30,11 +30,15 @@ venv.bak/
 
 # Environment variables
 .env
+.env.*
 .env.local
+.env.development
 .env.development.local
 .env.test.local
 .env.production.local
 acrac.env
+backend/.env.*
+frontend/.env.*
 
 # Database
 *.db
@@ -105,3 +109,20 @@ RAGAS/
 
 # Archive
 archive/
+
+# Sensitive data files
+ACR_data/
+backend/uploads/
+backend/app/uploads/
+uploads/
+*.csv
+*.xlsx
+*.xls
+!**/example*.csv
+!**/sample*.csv
+!**/test*.csv
+
+# API keys and secrets
+**/config/*.json
+!**/config/*example*.json
+!**/config/*sample*.json
