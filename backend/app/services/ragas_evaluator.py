@@ -87,10 +87,30 @@ class RAGASEvaluator:
             raise ImportError("RAGAS相关依赖未安装，请安装ragas、langchain-openai等依赖")
 
         # API 配置
+        # 首选传入的 base_url，其次根据模型名做启发式选择（Ollama 优先），否则回退到环境变量顺序
+        _llm = llm_model or os.getenv("SILICONFLOW_LLM_MODEL") or ""
+        _emb = embedding_model or os.getenv("SILICONFLOW_EMBEDDING_MODEL") or ""
+        prefer_ollama = (":" in str(_llm)) or (":" in str(_emb))
+        if base_url:
+            self.base_url = base_url
+        elif prefer_ollama and os.getenv("OLLAMA_BASE_URL"):
+            self.base_url = os.getenv("OLLAMA_BASE_URL")
+        else:
+            self.base_url = (
+                os.getenv("OPENAI_BASE_URL")
+                or os.getenv("SILICONFLOW_BASE_URL")
+                or os.getenv("OLLAMA_BASE_URL")
+                or "https://api.siliconflow.cn/v1"
+            )
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("SILICONFLOW_API_KEY")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL") or os.getenv("SILICONFLOW_BASE_URL") or "https://api.siliconflow.cn/v1"
+        # 兼容本地 Ollama（OpenAI 兼容端点通常不需要密钥）
         if not self.api_key:
-            raise ValueError("未找到API密钥，请设置OPENAI_API_KEY或SILICONFLOW_API_KEY环境变量")
+            base_lower = (self.base_url or "").lower()
+            if ("localhost:11434" in base_lower) or ("127.0.0.1:11434" in base_lower) or ("/v1" in base_lower and "ollama" in base_lower):
+                # 占位密钥以满足 OpenAI SDK 的参数要求
+                self.api_key = "ollama"
+            else:
+                raise ValueError("未找到API密钥，请设置OPENAI_API_KEY或SILICONFLOW_API_KEY环境变量")
 
         # 模型名称（允许来自 .env）
         llm_model = llm_model or os.getenv("SILICONFLOW_LLM_MODEL") or "gpt-3.5-turbo"

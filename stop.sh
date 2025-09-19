@@ -31,6 +31,19 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 选择 docker compose 命令
+select_dc() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        echo docker-compose
+    else
+        if docker compose version >/dev/null 2>&1; then
+            echo "docker compose"
+        else
+            echo docker-compose
+        fi
+    fi
+}
+
 # 停止前端服务
 stop_frontend() {
     log_info "停止前端服务..."
@@ -73,8 +86,8 @@ stop_backend() {
 # 停止数据库服务
 stop_database() {
     log_info "停止数据库服务..."
-    
-    docker-compose down
+    DC="$(select_dc)"
+    $DC down
     
     log_success "数据库服务已停止"
 }

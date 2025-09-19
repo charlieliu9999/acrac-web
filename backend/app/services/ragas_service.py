@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.schemas.ragas_schemas import TestCaseBase, EvaluationResult, TaskStatus
+from app.core.config import settings
 from app.models.ragas_models import EvaluationTask, ScenarioResult, EvaluationMetrics
 
 # 配置日志
@@ -218,10 +219,8 @@ async def run_real_rag_evaluation(
     - RAG_API_URL 不可用时，单条用例计为失败但不中断整体流程
     - RAGAS 依赖缺失或 API Key 缺失时，自动跳过评分，记 0 分
     """
-    rag_api_url = os.getenv(
-        "RAG_API_URL",
-        "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
-    )
+    # 优先取环境变量 RAG_API_URL；否则使用 settings.RAG_API_URL（配置文件/环境统一管理）
+    rag_api_url = os.getenv("RAG_API_URL", settings.RAG_API_URL)
 
     evaluation_results: List[Dict[str, Any]] = []
     # 如指定 data_count 且 > 0，则仅评前 N 条
@@ -349,13 +348,10 @@ async def run_real_rag_evaluation(
             # 计算 RAGAS 分数（若可用）
             evaluation_started_at = None
             evaluation_completed_at = None
-            # 评分：优先使用RAGAS评估器，否则退化到简易启发式评分（避免全为0）
-            ragas_scores = {
-                "faithfulness": 0.0,
-                "answer_relevancy": 0.0,
-                "context_precision": 0.0,
-                "context_recall": 0.0,
-            }
+            # 评分：优先使用RAGAS评估器
+            # 若未能初始化评估器或上下文不足，默认不生成“伪造”分数（可通过环境变量显式开启）
+            allow_heuristic = (os.getenv("RAGAS_ALLOW_HEURISTIC", "false").lower() == "true")
+            ragas_scores: Optional[Dict[str, float]] = None
             try:
                 if ragas_evaluator and contexts and answer_text and ground_truth:
                     evaluation_started_at = datetime.now()
@@ -368,29 +364,33 @@ async def run_real_rag_evaluation(
                         }
                     )
                     evaluation_completed_at = datetime.now()
-                    # 如果评估器未报错但返回的四项均为0，则用启发式评分兜底
-                    try:
-                        vals = [float(ragas_scores.get(k, 0.0) or 0.0) for k in ("faithfulness","answer_relevancy","context_precision","context_recall")]
-                        if sum(vals) == 0.0:
-                            ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
-                    except Exception:
-                        pass
-                else:
+                    # 若评估器返回全0，且允许启发式，则启发式兜底
+                    if ragas_scores and allow_heuristic:
+                        try:
+                            vals = [float(ragas_scores.get(k, 0.0) or 0.0) for k in ("faithfulness","answer_relevancy","context_precision","context_recall")]
+                            if sum(vals) == 0.0:
+                                ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
+                        except Exception:
+                            pass
+                elif allow_heuristic:
                     ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
             except Exception as e:
-                logger.warning(f"RAGAS评分计算失败，使用启发式评分替代: {e}")
-                ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
+                logger.warning(f"RAGAS评分计算失败: {e}")
+                if allow_heuristic:
+                    ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
 
             # 单条整体得分
-            try:
-                overall_score = (
-                    ragas_scores.get("faithfulness", 0.0)
-                    + ragas_scores.get("answer_relevancy", 0.0)
-                    + ragas_scores.get("context_precision", 0.0)
-                    + ragas_scores.get("context_recall", 0.0)
-                ) / 4.0
-            except Exception:
-                overall_score = None
+            overall_score = None
+            if ragas_scores:
+                try:
+                    overall_score = (
+                        float(ragas_scores.get("faithfulness", 0.0) or 0.0)
+                        + float(ragas_scores.get("answer_relevancy", 0.0) or 0.0)
+                        + float(ragas_scores.get("context_precision", 0.0) or 0.0)
+                        + float(ragas_scores.get("context_recall", 0.0) or 0.0)
+                    ) / 4.0
+                except Exception:
+                    overall_score = None
 
             # 写入数据库（若提供）
             if db and task_id:
@@ -403,10 +403,10 @@ async def run_real_rag_evaluation(
                     rag_contexts=contexts,
                     rag_trace_data=rag_result.get("trace"),
                     standard_answer=ground_truth,
-                    faithfulness_score=ragas_scores.get("faithfulness", 0.0),
-                    answer_relevancy_score=ragas_scores.get("answer_relevancy", 0.0),
-                    context_precision_score=ragas_scores.get("context_precision", 0.0),
-                    context_recall_score=ragas_scores.get("context_recall", 0.0),
+                    faithfulness_score=(ragas_scores.get("faithfulness") if ragas_scores else None),
+                    answer_relevancy_score=(ragas_scores.get("answer_relevancy") if ragas_scores else None),
+                    context_precision_score=(ragas_scores.get("context_precision") if ragas_scores else None),
+                    context_recall_score=(ragas_scores.get("context_recall") if ragas_scores else None),
                     overall_score=overall_score,
                     evaluation_metadata={
                         "clinical_scenario_text": clinical_query,
@@ -452,6 +452,7 @@ async def run_real_rag_evaluation(
                 "rag_answer": answer_text,
                 "ground_truth": ground_truth,
                 "ragas_scores": ragas_scores,
+                "score_source": score_source,
                 "contexts": contexts,
                 "llm_recommendations": llm_recs,
                 "trace": (rag_result or {}).get("trace"),

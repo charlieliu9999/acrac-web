@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Layout, Menu, Switch, theme, message } from 'antd'
+import { Layout, Menu, Switch, theme, message, Badge, Space, Tooltip } from 'antd'
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import RAGAssistant from './pages/RAGAssistant'
 import RulesManager from './pages/RulesManager'
@@ -20,6 +20,8 @@ function App() {
   const navigate = useNavigate()
   const [enabled, setEnabled] = useState<boolean>(false)
   const [auditOnly, setAuditOnly] = useState<boolean>(true)
+  const [sysStatus, setSysStatus] = useState<any>(null)
+  const [statusLoading, setStatusLoading] = useState<boolean>(false)
 
   const selectedKey = React.useMemo(() => {
     if (location.pathname.startsWith('/rules')) return 'rules'
@@ -36,6 +38,24 @@ function App() {
       setEnabled(res.data.enabled)
       setAuditOnly(res.data.audit_only)
     }).catch(() => {})
+  }, [])
+
+  const loadStatus = async () => {
+    try {
+      setStatusLoading(true)
+      const r = await api.get('/api/v1/admin/data/system/status')
+      setSysStatus(r.data)
+    } catch (e) {
+      setSysStatus({ api: { status: 'error' } })
+    } finally {
+      setStatusLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadStatus()
+    const t = setInterval(loadStatus, 20000)
+    return () => clearInterval(t)
   }, [])
 
   const updateRules = async (p: { enabled?: boolean; audit_only?: boolean }) => {
@@ -56,6 +76,28 @@ function App() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider breakpoint="lg" collapsedWidth="0">
         <div className="logo">ACRAC Admin</div>
+        <div className="sys-status" style={{ padding: '8px 12px', color: '#fff', fontSize: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>系统状态 {statusLoading ? '…' : ''}</div>
+          <Space direction='vertical' size={4} style={{ width: '100%' }}>
+            <div>
+              <Badge status={(sysStatus?.api?.status==='ok')?'success':((sysStatus?.api?.status)?'error':'default')} text='API' />
+            </div>
+            <div>
+              <Badge status={(sysStatus?.db?.status==='ok')?'success':((sysStatus?.db?.status)?'error':'default')} text='数据库' />
+            </div>
+            <div>
+              <Tooltip title={sysStatus?.embedding?.model || sysStatus?.embedding?.dimension ? `dim:${sysStatus?.embedding?.dimension||''}`: ''}>
+                <Badge status={(sysStatus?.embedding?.status==='ok')?'success':((sysStatus?.embedding?.status)?'error':'default')} text='Embedding' />
+              </Tooltip>
+            </div>
+            <div>
+              <Badge status={(sysStatus?.llm?.status==='ok')?'success':((sysStatus?.llm?.status)?'error':'default')} text='LLM' />
+            </div>
+            <div>
+              <Badge status={(sysStatus?.reranker?.status==='ok')?'success':((sysStatus?.reranker?.status)?'error':'default')} text='Reranker' />
+            </div>
+          </Space>
+        </div>
         <Menu
           theme="dark"
           mode="inline"
@@ -111,4 +153,3 @@ function App() {
 }
 
 export default App
-

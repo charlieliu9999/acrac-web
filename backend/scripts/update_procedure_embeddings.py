@@ -12,11 +12,15 @@ API_KEY = os.getenv('SILICONFLOW_API_KEY')
 EMB_MODEL = os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
 
 def embed(text: str) -> list:
-    if not API_KEY:
-        raise RuntimeError('SILICONFLOW_API_KEY not set')
+    prefers_ollama = ('11434' in (API_BASE or '')) or ('ollama' in (API_BASE or '').lower())
+    headers = {"Content-Type": "application/json"}
+    if not prefers_ollama:
+        if not API_KEY:
+            raise RuntimeError('SILICONFLOW_API_KEY not set')
+        headers["Authorization"] = f"Bearer {API_KEY}"
     resp = requests.post(
-        f"{API_BASE}/embeddings",
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+        f"{API_BASE.rstrip('/')}/embeddings",
+        headers=headers,
         json={"model": EMB_MODEL, "input": text, "encoding_format": "float"},
         timeout=60,
     )
@@ -73,4 +77,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

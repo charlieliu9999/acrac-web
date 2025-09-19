@@ -1,0 +1,262 @@
+[
+  {
+    "question_id": "1",
+    "clinical_query": "45岁女性，慢性反复头痛3年，无神经系统异常体征。",
+    "ground_truth": "MR颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.738095,
+      "answer_relevancy": 0.238095,
+      "context_precision": 0.952381,
+      "context_recall": 0.058997
+    },
+    "timestamp": 1758172332.258992,
+    "metadata": null
+  },
+  {
+    "question_id": "2",
+    "clinical_query": "32岁男性，10分钟前突发剧烈\"雷击样\"头痛，无神经系统体征。",
+    "ground_truth": "CT颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.703704,
+      "answer_relevancy": 0.185185,
+      "context_precision": 0.925926,
+      "context_recall": 0.058962
+    },
+    "timestamp": 1758172342.625695,
+    "metadata": null
+  },
+  {
+    "question_id": "3",
+    "clinical_query": "50岁女性，3天前开始出现左侧肢体无力，伴新发头痛。",
+    "ground_truth": "MR颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.738095,
+      "answer_relevancy": 0.238095,
+      "context_precision": 0.952381,
+      "context_recall": 0.045249
+    },
+    "timestamp": 1758172352.756323,
+    "metadata": null
+  },
+  {
+    "question_id": "4",
+    "clinical_query": "70岁男性，一周内头痛模式明显改变，原有镇痛药无效。",
+    "ground_truth": "MR颅内动脉血管成像(MRA)",
+    "ragas_scores": {
+      "faithfulness": 0.610294,
+      "answer_relevancy": 0.117647,
+      "context_precision": 0.821429,
+      "context_recall": 0.175573
+    },
+    "timestamp": 1758172359.902583,
+    "metadata": null
+  },
+  {
+    "question_id": "5",
+    "clinical_query": "55岁男性，新发头痛，伴发热和颈部僵硬。",
+    "ground_truth": "CT颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.738095,
+      "answer_relevancy": 0.238095,
+      "context_precision": 0.952381,
+      "context_recall": 0.050125
+    },
+    "timestamp": 1758172368.675587,
+    "metadata": null
+  },
+  {
+    "question_id": "6",
+    "clinical_query": "35岁女性，头痛伴视物模糊，有乳腺癌病史。",
+    "ground_truth": "MR颅脑(平扫)；* MR眼部(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.568534,
+      "answer_relevancy": 0.125,
+      "context_precision": 0.758621,
+      "context_recall": 0.059621
+    },
+    "timestamp": 1758172377.539741,
+    "metadata": null
+  },
+  {
+    "question_id": "7",
+    "clinical_query": "25岁男性，突发头痛，伴短暂意识丧失，担心蛛网膜下腔出血。",
+    "ground_truth": "CT颅脑(平扫+增强)",
+    "ragas_scores": {
+      "faithfulness": 0.606583,
+      "answer_relevancy": 0.090909,
+      "context_precision": 0.827586,
+      "context_recall": 0.058968
+    },
+    "timestamp": 1758172388.230527,
+    "metadata": null
+  },
+  {
+    "question_id": "8",
+    "clinical_query": "22岁女性，头痛伴颈部疼痛，疑似颈静脉血栓形成。",
+    "ground_truth": "颈部血管超声（彩色多普勒超声）",
+    "ragas_scores": {
+      "faithfulness": 0.641667,
+      "answer_relevancy": 0,
+      "context_precision": 0.916667,
+      "context_recall": 0.06414
+    },
+    "timestamp": 1758172400.916346,
+    "metadata": null
+  },
+  {
+    "question_id": "9",
+    "clinical_query": "60岁男性，突发眩晕，伴恶心呕吐，无听力下降。",
+    "ground_truth": "CT颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.751724,
+      "answer_relevancy": 0.172414,
+      "context_precision": 1,
+      "context_recall": 0.065909
+    },
+    "timestamp": 1758172410.35167,
+    "metadata": null
+  },
+  {
+    "question_id": "10",
+    "clinical_query": "72岁女性，6个月内逐渐出现记忆力下降，怀疑痴呆。",
+    "ground_truth": "MR颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.734783,
+      "answer_relevancy": 0.217391,
+      "context_precision": 0.956522,
+      "context_recall": 0.046709
+    },
+    "timestamp": 1758172419.485035,
+    "metadata": null
+  },
+  {
+    "question_id": "11",
+    "clinical_query": "58岁男性，短暂性左侧肢体无力，持续15分钟后完全恢复。",
+    "ground_truth": "MR颅脑弥散加权成像(DWI)",
+    "ragas_scores": {
+      "faithfulness": 0.536746,
+      "answer_relevancy": 0.064516,
+      "context_precision": 0.73913,
+      "context_recall": 0.145299
+    },
+    "timestamp": 1758172426.801465,
+    "metadata": null
+  },
+  {
+    "question_id": "12",
+    "clinical_query": "35岁男性，首次全身性强直-阵挛发作，无发热或创伤史。",
+    "ground_truth": "CT颅脑(平扫)",
+    "ragas_scores": {
+      "faithfulness": 0.555983,
+      "answer_relevancy": 0.148148,
+      "context_precision": 0.730769,
+      "context_recall": 0.037924
+    },
+    "timestamp": 1758172434.835339,
+    "metadata": null
+  },
+  {
+    "question_id": "13",
+    "clinical_query": "40岁女性，持续性视物模糊，眼科检查怀疑视神经炎。",
+    "ground_truth": "MR颅脑(增强)；* MR视神经(增强)",
+    "ragas_scores": {
+      "faithfulness": 0.727258,
+      "answer_relevancy": 0.192308,
+      "context_precision": 0.956522,
+      "context_recall": 0.04793
+    },
+    "timestamp": 1758172446.024873,
+    "metadata": null
+  },
+  {
+    "question_id": "14",
+    "clinical_query": "交通事故后的25岁男性，颈部疼痛，GCS 15分，无神经系统异常。",
+    "ground_truth": "CT颈椎(平扫+三维重建)",
+    "ragas_scores": {
+      "faithfulness": 0.666071,
+      "answer_relevancy": 0.178571,
+      "context_precision": 0.875,
+      "context_recall": 0.052764
+    },
+    "timestamp": 1758172456.240706,
+    "metadata": null
+  },
+  {
+    "question_id": "15",
+    "clinical_query": "45岁女性，家族有颅内动脉瘤史，要求筛查未破裂动脉瘤。",
+    "ground_truth": "MR颅内动脉血管成像(MRA)",
+    "ragas_scores": {
+      "faithfulness": 0.575789,
+      "answer_relevancy": 0.052632,
+      "context_precision": 0.8,
+      "context_recall": 0.058394
+    },
+    "timestamp": 1758172458.754019,
+    "metadata": null
+  },
+  {
+    "question_id": "16",
+    "clinical_query": "胸部CT偶然发现7mm肺结节，无肺癌高危因素。",
+    "ground_truth": "CT胸部(低剂量扫描)",
+    "ragas_scores": {
+      "faithfulness": 0.579194,
+      "answer_relevancy": 0.029412,
+      "context_precision": 0.814815,
+      "context_recall": 0.058511
+    },
+    "timestamp": 1758172467.075335,
+    "metadata": null
+  },
+  {
+    "question_id": "17",
+    "clinical_query": "52岁男性，咯血3天，30包年吸烟史。",
+    "ground_truth": "CT胸部(平扫+增强)",
+    "ragas_scores": {
+      "faithfulness": 0.49,
+      "answer_relevancy": 0,
+      "context_precision": 0.7,
+      "context_recall": 0.048951
+    },
+    "timestamp": 1758172469.879394,
+    "metadata": null
+  },
+  {
+    "question_id": "18",
+    "clinical_query": "65岁男性，突发撕裂样胸痛，血压160/90mmHg，怀疑主动脉夹层。",
+    "ground_truth": "CT胸主动脉血管成像(CTA)",
+    "ragas_scores": {
+      "faithfulness": 0.727273,
+      "answer_relevancy": 0.30303,
+      "context_precision": 0.909091,
+      "context_recall": 0.052448
+    },
+    "timestamp": 1758172481.760588,
+    "metadata": null
+  },
+  {
+    "question_id": "19",
+    "clinical_query": "27岁妊娠24周孕妇，突发胸痛和呼吸困难，D-二聚体升高，怀疑肺栓塞。",
+    "ground_truth": "CT肺动脉血管成像(CTPA)",
+    "ragas_scores": {
+      "faithfulness": 0.697059,
+      "answer_relevancy": 0.264706,
+      "context_precision": 0.882353,
+      "context_recall": 0.076726
+    },
+    "timestamp": 1758172492.436971,
+    "metadata": null
+  },
+  {
+    "question_id": "20",
+    "clinical_query": "62岁男性，进行性呼吸困难2个月，双肺底部啰音，怀疑间质性肺病。",
+    "ground_truth": "CT胸部高分辨率扫描(HRCT)",
+    "ragas_scores": {
+      "faithfulness": 0.630556,
+      "answer_relevancy": 0.027778,
+      "context_precision": 0.888889,
+      "context_recall": 0.057554
+    },
+    "timestamp": 1758172501.756706,
+    "metadata": null
+  }
+]

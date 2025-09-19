@@ -1,0 +1,16 @@
+{
+  "contexts": {
+    "inference": {
+      "llm_model": "qwen3:30b",
+      "embedding_model": "qwen3-embed-4b:latest",
+      "reranker_model": "BAAI/bge-reranker-v2-m3",
+      "base_url": "http://host.docker.internal:11434/v1"
+    },
+    "evaluation": {
+      "llm_model": "qwen3:30b",
+      "embedding_model": "qwen3-embed-4b:latest",
+      "base_url": "https://api.siliconflow.cn/v1"
+    }
+  },
+  "scenario_overrides": []
+}

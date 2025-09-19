@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Button, Card, Col, Collapse, Form, Input, InputNumber, Row, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { Button, Card, Col, Collapse, Form, Input, InputNumber, Row, Switch, Table, Tag, Tooltip, Typography, Space } from 'antd'
 import { api } from '../api/http'
 
 const { Text, Paragraph } = Typography
@@ -115,6 +115,14 @@ const RAGAssistant: React.FC = () => {
 
           <Card title='流程详情' style={{ marginTop: 12 }}>
             <div>模式：{result.is_low_similarity_mode ? 'no-RAG' : 'RAG'}</div>
+            <div style={{ marginTop: 6 }}>
+              <Text type='secondary'>模型：</Text>
+              <Space size={16} style={{ marginLeft: 6 }}>
+                <span>LLM: <Tag color='blue'>{result.model_used || '-'}</Tag></span>
+                <span>Embedding: <Tag color='geekblue'>{result.embedding_model_used || '-'}</Tag></span>
+                <span>Reranker: <Tag color='purple'>{result.reranker_model_used || '-'}</Tag></span>
+              </Space>
+            </div>
             <Collapse bordered={false} style={{ marginTop: 8 }} items={[
               {
                 key: 'recall', label: '① 召回场景（Top8）', children: (

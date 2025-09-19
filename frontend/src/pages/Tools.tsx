@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Button, Card, Col, Form, Input, InputNumber, Row, Space, Table, Typography, message, Statistic, Alert, Collapse } from 'antd'
+import { Button, Card, Col, Form, Input, InputNumber, Row, Space, Table, Typography, message, Statistic, Alert, Collapse, Upload, Select, Radio } from 'antd'
+import type { UploadProps } from 'antd'
 import { api } from '../api/http'
 
 const { Paragraph } = Typography
@@ -18,6 +19,12 @@ const Tools: React.FC = () => {
   const [ragasSchema, setRagasSchema] = useState<any>(null)
   const [vectorStatus, setVectorStatus] = useState<any>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [csvPath, setCsvPath] = useState<string>('')
+  const [importForm] = Form.useForm()
+  const [registry, setRegistry] = useState<any>({ llms: [], embeddings: [], rerankers: [] })
+  const [regLoading, setRegLoading] = useState(false)
+  const [contexts, setContexts] = useState<any>({ inference: {}, evaluation: {} })
 
   // LLM输出解析示例
   const exampleLLMOutput = `{
@@ -119,6 +126,127 @@ const Tools: React.FC = () => {
       message.error('获取向量状态失败: ' + (e?.response?.data?.detail || e.message))
     } finally {
       setLoadingStatus(false)
+    }
+  }
+
+  // 加载模型库（用于导入面板 Embedding 下拉）
+  const loadRegistry = async () => {
+    try {
+      setRegLoading(true)
+      const r = await api.get('/api/v1/admin/data/models/registry')
+      setRegistry(r.data || { llms: [], embeddings: [], rerankers: [] })
+    } catch (e:any) {
+      message.error('加载模型库失败：' + (e?.response?.data?.detail || e.message))
+      setRegistry({ llms: [], embeddings: [], rerankers: [] })
+    } finally {
+      setRegLoading(false)
+    }
+  }
+
+  useEffect(() => { loadRegistry() }, [])
+  useEffect(() => {
+    const loadCtx = async () => {
+      try {
+        const res = await api.get('/api/v1/admin/data/models/config')
+        setContexts(res.data?.contexts || { inference: {}, evaluation: {} })
+      } catch (e:any) {
+        message.error('加载模型配置失败：' + (e?.response?.data?.detail || e.message))
+      }
+    }
+    loadCtx()
+  }, [])
+
+  const embeddingOptions = useMemo(() => {
+    const map = new Map<string, any>()
+    const ensure = (model?: string, label?: string, entry?: any) => {
+      const val = (model || '').trim()
+      if (!val || map.has(val)) return
+      map.set(val, { value: val, label: label || val, _entry: entry })
+    }
+    (registry.embeddings || []).forEach((it:any) => ensure(it.model, it.label || it.model, it))
+    ensure(contexts?.inference?.embedding_model, `推理 · ${contexts?.inference?.embedding_model || ''}`)
+    ensure(contexts?.evaluation?.embedding_model, `评测 · ${contexts?.evaluation?.embedding_model || ''}`)
+    return Array.from(map.values())
+  }, [registry, contexts])
+
+  const handleEmbeddingSelectChange = async (v: any, opt: any) => {
+    const entry = opt?._entry
+    let base = entry?.base_url
+    if (!base) {
+      if (contexts?.inference?.embedding_model === v) base = contexts?.inference?.base_url
+      else if (contexts?.evaluation?.embedding_model === v) base = contexts?.evaluation?.base_url
+    }
+    if (base) {
+      importForm.setFieldsValue({ base_url: base })
+    }
+    if (entry) {
+      try {
+        const resp = await api.post('/api/v1/admin/data/models/check-model', entry)
+        const dim = Number(resp?.data?.dimension || 0)
+        if (dim > 0) {
+          importForm.setFieldsValue({ embedding_dim: dim })
+          message.success(`已探测向量维度：${dim}`)
+        }
+      } catch (e:any) {
+        // ignore
+      }
+    }
+  }
+
+  // ---- 数据导入/重建 ----
+  const uploadProps: UploadProps = {
+    name: 'file',
+    multiple: false,
+    showUploadList: false,
+    customRequest: async (opt) => {
+      try {
+        const fd = new FormData()
+        fd.append('file', opt.file as any)
+        const r = await api.post('/api/v1/admin/data/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+        const p = r.data?.path || ''
+        setCsvPath(p)
+        message.success('上传成功')
+        opt.onSuccess && opt.onSuccess(r.data as any)
+      } catch (e: any) {
+        message.error('上传失败：' + (e?.response?.data?.detail || e.message))
+        opt.onError && opt.onError(e)
+      }
+    }
+  }
+
+  const doImport = async (v: any) => {
+    if (!csvPath && !v.csv_path) {
+      message.warning('请先上传CSV或填入服务器路径')
+      return
+    }
+    const model = (v.embedding_model || '').toLowerCase()
+    const base = (v.base_url || '').toLowerCase()
+    if (model.includes('qwen') || model.includes('ollama')) {
+      if (!base || (!base.includes('11434') && !base.includes('ollama'))) {
+        message.error('当前选择的是 Ollama 嵌入模型，但 Base URL 仍指向 SiliconFlow。请填写 http://host.docker.internal:11434/v1 或本机 Ollama 地址。')
+        return
+      }
+    }
+    setImporting(true)
+    try {
+      const payload = {
+        csv_path: v.csv_path || csvPath,
+        mode: v.mode || 'clear',
+        embedding_model: v.embedding_model || undefined,
+        embedding_dim: v.embedding_dim || undefined,
+        base_url: v.base_url || undefined,
+      }
+      const r = await api.post('/api/v1/admin/data/import', payload)
+      if (r.data?.started === false || (typeof r.data?.exit_code === 'number' && r.data.exit_code !== 0)) {
+        const tail = (r.data?.error_tail || '').slice(-1000)
+        message.error(tail ? `导入失败：\n${tail}` : '导入失败，请查看日志')
+      } else {
+        message.success('已触发导入/重建，详见日志：' + (r.data?.log_path || ''))
+      }
+    } catch (e:any) {
+      message.error('导入失败：' + (e?.response?.data?.detail || e.message))
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -309,6 +437,74 @@ const Tools: React.FC = () => {
               )}
             </Space>
           </Card>
+        </Panel>
+      </Collapse>
+
+      <Collapse defaultActiveKey={[]} style={{ marginTop: 16 }}>
+        <Panel header="数据导入 / 重建（Admin）" key="import">
+          <Alert 
+            type='warning' 
+            showIcon 
+            message='说明'
+            description={(
+              <div>
+                <div>· 支持从CSV重建数据库（清空重建）或追加导入。</div>
+                <div>· 可选设置 Embedding 模型与 Base URL（SiliconFlow 或本地 Ollama）。若使用 Ollama，请确保 Base URL 形如 http://localhost:11434/v1。</div>
+                <div>· 当模型维度非 1024（例如 qwen3-embed-4b 为 2560）时，请填写“向量维度”。</div>
+              </div>
+            )}
+            style={{ marginBottom: 12 }}
+          />
+          <Form form={importForm} layout='vertical' onFinish={doImport} initialValues={{ mode: 'clear', embedding_model: '', embedding_dim: undefined, base_url: '' }}>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label='上传CSV'>
+                  <Space>
+                    <Upload {...uploadProps}><Button>选择CSV文件并上传</Button></Upload>
+                    <Input placeholder='或直接填服务器CSV路径' value={csvPath} onChange={(e)=> setCsvPath(e.target.value)} style={{ width: 320 }} />
+                  </Space>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name='csv_path' label='服务器CSV路径（可选）'>
+                  <Input placeholder='/absolute/path/to/ACR_final.csv' />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={6}>
+                <Form.Item name='mode' label='导入模式'>
+                  <Select options={[{ value:'clear', label:'清空重建' }, { value:'add', label:'追加导入' }]} />
+                </Form.Item>
+              </Col>
+              <Col span={9}>
+                <Form.Item name='embedding_model' label='Embedding 模型（可选）'>
+                  <Select
+                    showSearch
+                    allowClear
+                    placeholder='选择模型库中的 Embedding 或手动输入'
+                    options={embeddingOptions}
+                    loading={regLoading}
+                    onChange={handleEmbeddingSelectChange}
+                    filterOption={(input, option)=> (option?.label as string).toLowerCase().includes(input.toLowerCase())}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={9}>
+                <Form.Item name='base_url' label='Embedding Base URL（可选）'>
+                  <Input placeholder='https://api.siliconflow.cn/v1 或 http://localhost:11434/v1' />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={6}>
+                <Form.Item name='embedding_dim' label='向量维度（可选）'>
+                  <InputNumber min={64} max={8192} style={{ width: '100%' }} placeholder='不填则自动探测/默认1024' />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Button type='primary' htmlType='submit' loading={importing}>开始导入/重建</Button>
+          </Form>
         </Panel>
       </Collapse>
     </div>

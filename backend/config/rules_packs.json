@@ -1,6 +1,23 @@
 {
   "packs": [
     {
+      "id": "scrotal_torsion_boost",
+      "scope": "rerank",
+      "enabled": true,
+      "priority": 15,
+      "rules": [
+        {
+          "id": "boost_scrotal_keywords",
+          "enabled": true,
+          "priority": 10,
+          "condition": {
+            "regex": ["query", "(阴囊|睾丸|扭转|scrot|scrotal|scrotum|torsion)"]
+          },
+          "action": { "type": "boost", "by": 0.2 }
+        }
+      ]
+    },
+    {
       "id": "pregnancy_safety_post",
       "scope": "post_llm",
       "enabled": true,

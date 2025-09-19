@@ -62,6 +62,8 @@ services:
       retries: 5
     networks:
       - acrac_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   celery_worker:
     build:
@@ -85,6 +87,8 @@ services:
       retries: 5
     networks:
       - acrac_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Frontend (dev in container)
   frontend:

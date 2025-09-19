@@ -38,7 +38,21 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查必要的命令
+# 选择 docker compose 命令
+select_dc() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        echo docker-compose
+    else
+        # prefer docker compose v2
+        if docker compose version >/dev/null 2>&1; then
+            echo "docker compose"
+        else
+            echo docker-compose
+        fi
+    fi
+}
+
+# 检查必要的命令与文件
 check_dependencies() {
     log_info "检查依赖..."
 
@@ -47,10 +61,9 @@ check_dependencies() {
         exit 1
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose未安装或未在PATH中"
-        exit 1
-    fi
+    # docker compose / docker-compose 二选一
+    DC="$(select_dc)"
+    log_info "使用Compose命令: $DC"
 
     log_success "所有依赖检查通过"
 }
@@ -60,10 +73,10 @@ start_services() {
     log_info "正在使用 Docker-Compose 启动所有服务..."
 
     # 停止并移除旧容器，以防冲突
-    docker-compose down
+    $DC down
 
     # 构建并启动所有服务
-    docker-compose up -d --build
+    $DC up -d --build
 
     log_info "等待服务启动并检查健康状态..."
 
@@ -71,11 +84,11 @@ start_services() {
     for ((ATTEMPT=1; ATTEMPT<=MAX_ATTEMPTS; ATTEMPT++)); do
         log_info "检查服务状态... (尝试次数: $ATTEMPT/$MAX_ATTEMPTS)"
 
-        STATUS_OUTPUT=$(docker-compose ps)
+        STATUS_OUTPUT=$($DC ps)
 
         if echo "$STATUS_OUTPUT" | grep -q "unhealthy"; then
             log_error "部分容器健康检查失败。请运行 'docker-compose logs' 查看详情。"
-            docker-compose ps
+            $DC ps
             exit 1
         fi
 
@@ -91,7 +104,7 @@ start_services() {
     done
 
     log_error "部分容器启动超时。请运行 'docker-compose logs' 查看详情。"
-    docker-compose ps
+    $DC ps
     exit 1
 }
 
@@ -105,8 +118,8 @@ show_status() {
     echo -e "  - ${GREEN}API文档:${NC} http://localhost:8001/docs"
     echo
     echo "=== 查看日志 ==="
-    echo "运行 'docker-compose logs -f' 查看所有服务的实时日志"
-    echo "运行 'docker-compose logs -f <service_name>' 查看特定服务的日志 (例如: backend, nginx)"
+    echo "运行 '$DC logs -f' 查看所有服务的实时日志"
+    echo "运行 '$DC logs -f <service_name>' 查看特定服务的日志 (例如: backend, nginx)"
     echo
     echo "=== 停止服务 ==="
     echo "运行 './stop.sh' 或 'docker-compose down' 停止所有服务"
@@ -116,6 +129,23 @@ show_status() {
 # 主函数
 main() {
     check_dependencies
+
+    # 预检：确保容器内使用docker环境变量而非本地.env
+    if [ -f "backend/.env.docker" ]; then
+        if ! grep -q "DOCKER_CONTEXT" backend/.env.docker; then
+            log_info "为 backend/.env.docker 添加 DOCKER_CONTEXT=true 与 SKIP_LOCAL_DOTENV=true 可避免容器读取本地 .env"
+        fi
+    fi
+
+    # 预检：可选检测宿主机 Ollama 是否可达
+    if command -v curl >/dev/null 2>&1; then
+        if curl -sSf http://localhost:11434/api/tags >/dev/null 2>&1 || curl -sSf http://localhost:11434/v1/models >/dev/null 2>&1; then
+            log_info "检测到宿主机 Ollama 运行中 (localhost:11434)"
+        else
+            log_info "未检测到宿主机 Ollama（可忽略，若使用 SiliconFlow 则无需）"
+        fi
+    fi
+
     start_services
     show_status
 

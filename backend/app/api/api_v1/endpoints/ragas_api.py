@@ -5,6 +5,7 @@ import uuid
 import time
 import logging
 import requests
+import openai
 import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
@@ -590,15 +591,47 @@ async def start_evaluation(
         if getattr(request, 'data_count', None) and isinstance(request.data_count, int) and request.data_count > 0:
             valid_cases = valid_cases[: request.data_count]
 
-        # 依赖的RAG-LLM服务健康检查，避免长时间排队失败
+        # 依赖的LLM直连健康检查（避免在同进程内自调HTTP导致死锁）
         rag_api_url_env = os.getenv("RAG_API_URL", "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation")
+        strict_connectivity = True
         try:
-            health_url = rag_api_url_env.replace("/intelligent-recommendation", "/rag-llm-status")
-            resp = requests.get(health_url, timeout=10)
-            if resp.status_code != 200:
-                logger.warning(f"RAG-LLM服务健康检查警告: {resp.status_code}, 但继续执行评测")
-        except Exception as e:
-            logger.warning(f"RAG-LLM服务健康检查失败: {str(e)}, 但继续执行评测")
+            # 可由 evaluation_config.strict 或环境变量 RAGAS_STRICT 控制
+            if isinstance(request.evaluation_config, dict) and 'strict' in request.evaluation_config:
+                strict_connectivity = bool(request.evaluation_config.get('strict'))
+            else:
+                strict_connectivity = os.getenv('RAGAS_STRICT', 'true').lower() == 'true'
+        except Exception:
+            strict_connectivity = True
+
+        if strict_connectivity:
+            try:
+                # 选择基础URL与密钥（支持 Ollama/SiliconFlow/OpenAI 兼容）
+                prefer_ollama = (":" in str(request.model_name))
+                if getattr(request, 'base_url', None):
+                    base_url = request.base_url
+                elif prefer_ollama and os.getenv('OLLAMA_BASE_URL'):
+                    base_url = os.getenv('OLLAMA_BASE_URL')
+                else:
+                    base_url = os.getenv('OPENAI_BASE_URL') or os.getenv('SILICONFLOW_BASE_URL') or os.getenv('OLLAMA_BASE_URL')
+                # 规范化 Ollama 地址：确保以 /v1 结尾，避免 404
+                try:
+                    import re as _re
+                    if base_url and ("11434" in base_url or 'ollama' in (base_url or '').lower()):
+                        base_url = _re.sub(r"/+rerank/?$", "", base_url.rstrip('/'))
+                        if not _re.search(r"/v1/?$", base_url):
+                            base_url = base_url.rstrip('/') + '/v1'
+                except Exception:
+                    pass
+                api_key = os.getenv('OPENAI_API_KEY') or os.getenv('SILICONFLOW_API_KEY') or os.getenv('OLLAMA_API_KEY') or 'ollama'
+                client = openai.OpenAI(api_key=api_key, base_url=base_url) if base_url else openai.OpenAI(api_key=api_key)
+                _ = client.chat.completions.create(
+                    model=request.model_name,
+                    messages=[{"role": "user", "content": "ping"}],
+                    max_tokens=1,
+                    temperature=0
+                )
+            except Exception as e:
+                raise HTTPException(status_code=503, detail=f"LLM连接失败，请检查模型与端点（{request.model_name} @ {base_url or 'default'}）：{e}")
 
         # 创建评测任务
         task_id = str(uuid.uuid4())
@@ -703,6 +736,8 @@ async def get_task_status(task_id: str, db: Session = Depends(get_db)):
             "progress": task.progress_percentage,
             "completed_cases": task.completed_scenarios,
             "failed_cases": task.failed_scenarios,
+            "total": task.total_scenarios,
+            "total_cases": task.total_scenarios,
             "start_time": task.started_at,
             "end_time": task.completed_at,
             "error_message": task.error_message

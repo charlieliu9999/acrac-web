@@ -21,33 +21,56 @@ from pydantic import BaseModel, ValidationError, Field
 from typing import Union
 from pathlib import Path
 
-# 加载环境变量：统一从 backend/.env 读取，若不存在则回退默认行为
+# 加载环境变量：默认读取 backend/.env；若在容器环境可通过 SKIP_LOCAL_DOTENV/DOCKER_CONTEXT 禁用
 try:
-    env_path = Path(__file__).resolve().parents[2] / ".env"
-    if env_path.exists():
-        load_dotenv(str(env_path))
+    if os.getenv('SKIP_LOCAL_DOTENV', '').lower() == 'true' or os.getenv('DOCKER_CONTEXT', '').lower() == 'true':
+        pass
     else:
-        load_dotenv()
+        env_path = Path(__file__).resolve().parents[2] / ".env"
+        if env_path.exists():
+            load_dotenv(str(env_path))
+        else:
+            load_dotenv()
 except Exception:
-    load_dotenv()
+    pass
 
 logger = logging.getLogger(__name__)
 
-def embed_with_siliconflow(text: str, api_key: Optional[str] = None, model: str = "BAAI/bge-m3", timeout: int = 60) -> List[float]:
-    """使用SiliconFlow API生成文本嵌入向量"""
-    api_key = api_key or os.getenv("SILICONFLOW_API_KEY")
-    if not api_key:
-        logger.warning("SILICONFLOW_API_KEY not set; using random vector")
-        return np.random.rand(1024).tolist()
+def embed_with_siliconflow(
+    text: str,
+    api_key: Optional[str] = None,
+    model: str = "BAAI/bge-m3",
+    timeout: int = 60,
+    base_url: Optional[str] = None,
+) -> List[float]:
+    """生成文本嵌入（OpenAI 兼容协议）。
+    支持：SiliconFlow、OpenAI、OpenRouter、Ollama（/v1/embeddings）。
+    - 当 base_url 指向 Ollama（含 11434 或 'ollama'）时，不需要 API key。
+    - 其余情况优先使用提供的 api_key 或环境变量（OPENAI_API_KEY / SILICONFLOW_API_KEY / OPENROUTER_API_KEY）。
+    失败时返回随机向量以不中断流程（但会记录告警）。
+    """
     try:
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        endpoint = (base_url
+                    or os.getenv("OPENAI_BASE_URL")
+                    or os.getenv("SILICONFLOW_BASE_URL")
+                    or os.getenv("OLLAMA_BASE_URL")
+                    or "https://api.siliconflow.cn/v1").rstrip("/")
+        prefers_ollama = ("11434" in endpoint) or ("ollama" in endpoint.lower())
+        # 选择 API Key（Ollama 不需要）
+        key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("SILICONFLOW_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+        headers = {"Content-Type": "application/json"}
+        if not prefers_ollama and key:
+            headers["Authorization"] = f"Bearer {key}"
         payload = {"model": model, "input": text}
-        resp = requests.post("https://api.siliconflow.cn/v1/embeddings", json=payload, headers=headers, timeout=timeout)
+        resp = requests.post(f"{endpoint}/embeddings", json=payload, headers=headers, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
-        return data["data"][0]["embedding"]
+        emb = (data.get("data") or [{}])[0].get("embedding")
+        if not isinstance(emb, list):
+            raise ValueError("invalid embeddings response")
+        return emb
     except Exception as e:
-        logger.warning(f"SiliconFlow embedding failed: {e}; using random vector")
+        logger.warning(f"Embedding request failed ({base_url or 'default'}): {e}; using random vector")
         return np.random.rand(1024).tolist()
 
 class RAGLLMRecommendationService:
@@ -61,21 +84,47 @@ class RAGLLMRecommendationService:
             'user': os.getenv('PGUSER', 'postgres'),
             'password': os.getenv('PGPASSWORD', 'password')
         }
+        # pgvector recall quality: number of inverted lists to probe
+        # Higher probes improves recall at the cost of latency. Default 20.
+        try:
+            self.pgvector_probes = int(os.getenv('PGVECTOR_PROBES', '20'))
+        except Exception:
+            self.pgvector_probes = 20
         
-        # 配置LLM客户端（使用SiliconFlow的Qwen2.5-32B）
-        api_key = os.getenv("SILICONFLOW_API_KEY") or getattr(settings, "SILICONFLOW_API_KEY", "")
-        base_url = os.getenv("SILICONFLOW_BASE_URL") or getattr(settings, "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
-        self.llm_client = openai.OpenAI(api_key=api_key, base_url=base_url)
-        
-        # 配置参数
-        self.llm_model = os.getenv("SILICONFLOW_LLM_MODEL") or getattr(settings, "SILICONFLOW_LLM_MODEL", "Qwen/Qwen2.5-32B-Instruct")
+        # 基础模型连接配置
+        self.api_key = os.getenv("SILICONFLOW_API_KEY") or getattr(settings, "SILICONFLOW_API_KEY", "")
+        self.default_base_url = os.getenv("SILICONFLOW_BASE_URL") or getattr(settings, "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+        self.llm_client = openai.OpenAI(api_key=self.api_key, base_url=self.default_base_url)
+
+        # 预载模型上下文（默认+场景覆盖）
+        self.model_contexts: Dict[str, Dict[str, Any]] = {}
+        self.scenario_overrides: List[Dict[str, Any]] = []
+        self._override_index: Dict[str, List[Dict[str, Any]]] = {"panel": [], "topic": [], "scenario": [], "custom": []}
+        self.default_inference_context: Dict[str, Any] = {}
+        self.default_evaluation_context: Dict[str, Any] = {}
+        self._load_model_contexts()
+
+        # 配置参数（优先使用上下文，其次环境变量）
+        self.llm_model = self.default_inference_context.get("llm_model") \
+            or os.getenv("SILICONFLOW_LLM_MODEL") \
+            or getattr(settings, "SILICONFLOW_LLM_MODEL", "Qwen/Qwen2.5-32B-Instruct")
+        self.embedding_model = self.default_inference_context.get("embedding_model") \
+            or os.getenv("SILICONFLOW_EMBEDDING_MODEL") \
+            or "BAAI/bge-m3"
+        self.base_url = self.default_inference_context.get("base_url") or self.default_base_url
+        if self.base_url.rstrip('/') != self.default_base_url.rstrip('/'):
+            self.llm_client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
         self.similarity_threshold = float(os.getenv("VECTOR_SIMILARITY_THRESHOLD") or getattr(settings, "VECTOR_SIMILARITY_THRESHOLD", 0.6))
         self.debug_mode = (os.getenv("DEBUG_MODE", str(getattr(settings, "DEBUG_MODE", False))).lower() == "true")
         # 新增可调检索/候选参数
         self.scene_recall_topk = int(os.getenv("RAG_SCENE_RECALL_TOPK", "8"))  # 场景召回数量（用于检索，不等于展示数量）
         # reranker config
         self.use_reranker = os.getenv("RAG_USE_RERANKER", "true").lower() == "true"
-        self.reranker_model = os.getenv("RERANKER_MODEL") or getattr(settings, "RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+        self.reranker_model = self.default_inference_context.get("reranker_model") \
+            or os.getenv("RERANKER_MODEL") \
+            or getattr(settings, "RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+        # rerank provider: auto | siliconflow | ollama | local
+        self.rerank_provider = (os.getenv("RERANK_PROVIDER", "auto") or "auto").lower()
         # candidate recall topk (to control prompt length)
         self.procedure_candidate_topk = int(os.getenv("PROCEDURE_CANDIDATE_TOPK", "8"))
         # keyword config path for dynamic management
@@ -96,14 +145,136 @@ class RAGLLMRecommendationService:
             self.rules_engine = load_engine()
         except Exception:
             self.rules_engine = None
-    
+
+    def _load_model_contexts(self) -> None:
+        """加载模型上下文与场景覆盖配置"""
+        path = Path(__file__).resolve().parents[2] / "config" / "model_contexts.json"
+        data: Dict[str, Any] = {}
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding='utf-8'))
+            except Exception as exc:
+                logger.warning(f"读取模型上下文失败: {exc}")
+        contexts = data.get('contexts') or {}
+        overrides = data.get('scenario_overrides') or []
+        self.model_contexts = contexts
+        self.default_inference_context = self._clean_context(contexts.get('inference'))
+        self.default_evaluation_context = self._clean_context(contexts.get('evaluation'))
+        self.scenario_overrides = overrides
+        self._override_index = self._build_override_index(overrides)
+
+    @staticmethod
+    def _clean_context(ctx: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        cleaned: Dict[str, Any] = {}
+        if not ctx:
+            return cleaned
+        for key, value in ctx.items():
+            if value is None:
+                continue
+            if isinstance(value, str) and not value.strip():
+                continue
+            cleaned[key] = value
+        return cleaned
+
+    @staticmethod
+    def _build_override_index(overrides: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+        index: Dict[str, List[Dict[str, Any]]] = {"panel": [], "topic": [], "scenario": [], "custom": []}
+        for item in overrides or []:
+            scope_type = (item.get('scope_type') or 'custom').lower()
+            if scope_type not in index:
+                scope_type = 'custom'
+            index[scope_type].append(item)
+        return index
+
+    def _match_override(self, scope: Dict[str, Optional[str]]) -> Optional[Dict[str, Any]]:
+        sid = (scope.get('scenario_id') or '').strip()
+        if sid:
+            for item in self._override_index.get('scenario', []):
+                if (item.get('scope_id') or '').strip() == sid:
+                    return item
+        tid = (scope.get('topic_id') or '').strip()
+        if tid:
+            for item in self._override_index.get('topic', []):
+                if (item.get('scope_id') or '').strip() == tid:
+                    return item
+        pid = (scope.get('panel_id') or '').strip()
+        if pid:
+            for item in self._override_index.get('panel', []):
+                if (item.get('scope_id') or '').strip() == pid:
+                    return item
+        custom = (scope.get('custom') or '').strip()
+        if custom:
+            for item in self._override_index.get('custom', []):
+                if (item.get('scope_id') or '').strip() == custom:
+                    return item
+        return None
+
+    def _resolve_inference_context(self, scope: Dict[str, Optional[str]]) -> Dict[str, Any]:
+        ctx = dict(self.default_inference_context)
+        override = self._match_override(scope)
+        if override and override.get('inference'):
+            ctx.update(self._clean_context(override.get('inference')))
+        ctx.setdefault('llm_model', self.llm_model)
+        ctx.setdefault('embedding_model', self.embedding_model)
+        ctx.setdefault('base_url', self.base_url)
+        ctx.setdefault('reranker_model', self.reranker_model)
+        return ctx
+
+    def _extract_scope_info(self, scenarios: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+        if not scenarios:
+            return {}
+        primary = scenarios[0] or {}
+        return {
+            'scenario_id': primary.get('semantic_id') or primary.get('scenario_id'),
+            'topic_id': primary.get('topic_semantic_id') or primary.get('topic_id'),
+            'panel_id': primary.get('panel_semantic_id') or primary.get('panel_id'),
+        }
+
     def connect_db(self):
-        """建立数据库连接"""
-        return psycopg2.connect(**self.db_config)
+        """建立数据库连接（带重试与Docker主机名回退）"""
+        host = self.db_config.get('host') or 'localhost'
+        port = int(self.db_config.get('port') or 5432)
+        cfg_base = dict(self.db_config)
+        # 当在容器中且配置为localhost/127.0.0.1时，尝试回退到服务名 'postgres'
+        fallback_hosts = [host]
+        if str(host) in ('localhost', '127.0.0.1'):
+            fallback_hosts.append('postgres')
+        # 重试总时长
+        max_wait = int(os.getenv('DB_CONNECT_TIMEOUT', '30'))
+        interval = 2
+        start = time.time()
+        last_err = None
+        while time.time() - start < max_wait:
+            for h in fallback_hosts:
+                try:
+                    cfg = dict(cfg_base)
+                    cfg['host'] = h
+                    conn = psycopg2.connect(**cfg)
+                    if h != host:
+                        logger.warning(f"DB连接使用备用主机 '{h}'（原配置: '{host}'）")
+                    return conn
+                except Exception as e:
+                    last_err = e
+                    time.sleep(interval)
+        # 最终失败：给出提示信息，便于下次无需人工排查
+        hint = (
+            "数据库连接失败。请检查: "
+            "1) 在Docker内应使用 PGHOST=postgres；"
+            "2) docker-compose 服务是否已healthy；"
+            "3) 端口与网络是否被占用或被防火墙阻断。"
+        )
+        logger.error(f"DB连接失败（host={host}, port={port}）：{last_err}; {hint}")
+        raise last_err
     
     def search_clinical_scenarios(self, conn, query_vector: List[float], top_k: int = 3) -> List[Dict]:
         """搜索最相关的临床场景"""
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Improve ANN recall quality if IVFFLAT index is used
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    cur.execute(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)};")
+            except Exception:
+                pass
             vec_str = "[" + ",".join(map(str, query_vector)) + "]"
             sql = f"""
                 SELECT
@@ -116,7 +287,9 @@ class RAGLLMRecommendationService:
                     cs.gender,
                     cs.urgency_level,
                     cs.symptom_category,
+                    p.semantic_id as panel_semantic_id,
                     p.name_zh as panel_name,
+                    t.semantic_id as topic_semantic_id,
                     t.name_zh as topic_name,
                     (1 - (cs.embedding <=> '{vec_str}'::vector)) AS similarity
                 FROM clinical_scenarios cs
@@ -147,7 +320,9 @@ class RAGLLMRecommendationService:
                     cs.age_group,
                     cs.gender,
                     cs.urgency_level,
+                    p.semantic_id as panel_semantic_id,
                     p.name_zh as panel_name,
+                    t.semantic_id as topic_semantic_id,
                     t.name_zh as topic_name,
                     cr.procedure_id,
                     pd.name_zh AS procedure_name_zh,
@@ -195,7 +370,9 @@ class RAGLLMRecommendationService:
                     'age_group': row['age_group'],
                     'gender': row['gender'],
                     'urgency_level': row['urgency_level'],
+                    'panel_semantic_id': row.get('panel_semantic_id'),
                     'panel_name': row['panel_name'],
+                    'topic_semantic_id': row.get('topic_semantic_id'),
                     'topic_name': row['topic_name'],
                     'recommendations': []
                 }
@@ -402,6 +579,12 @@ JSON中不允许出现尾随逗号
         if conn is None:
             return []
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Improve ANN recall quality if IVFFLAT index is used
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    cur.execute(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)};")
+            except Exception:
+                pass
             vec_str = "[" + ",".join(map(str, query_vector)) + "]"
             sql = f"""
                 SELECT
@@ -424,15 +607,26 @@ JSON中不允许出现尾随逗号
                 r['procedure_name_zh'] = r.get('name_zh')
             return rows
     
-    def call_llm(self, prompt: str) -> str:
+    def call_llm(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
         """调用LLM进行推理（使用Qwen2.5-32B）"""
         try:
+            ctx = context or {}
+            model_name = ctx.get('llm_model') or self.llm_model
+            base_url = ctx.get('base_url') or self.base_url
+            api_key = ctx.get('api_key') or self.api_key
+            client = self.llm_client
+            # Ollama 端点通常无需真实 key，OpenAI SDK 需要一个值；使用占位 'ollama'
+            if base_url and (('11434' in base_url) or ('ollama' in base_url.lower())) and not api_key:
+                api_key = os.getenv('OLLAMA_API_KEY') or 'ollama'
+            if base_url.rstrip('/') != self.base_url.rstrip('/') or api_key != self.api_key:
+                client = openai.OpenAI(api_key=api_key, base_url=base_url)
+
             if self.debug_mode:
-                logger.info(f"LLM调用模型: {self.llm_model}")
+                logger.info(f"LLM调用模型: {model_name}")
                 logger.info(f"LLM提示词长度: {len(prompt)} 字符")
             
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
+            response = client.chat.completions.create(
+                model=model_name,
                 messages=[
                     {"role": "system", "content": (
                         "你是一位专业的放射科医生，擅长影像检查推荐。"
@@ -446,7 +640,7 @@ JSON中不允许出现尾随逗号
             )
             
             result = response.choices[0].message.content
-            
+
             if self.debug_mode:
                 logger.info(f"LLM原始响应长度: {len(result)} 字符")
                 logger.info(f"LLM原始响应: {result[:500]}...")  # 只显示前500字符
@@ -664,12 +858,25 @@ JSON中不允许出现尾随逗号
             do_debug = (debug_flag is True) or self.debug_mode
             if do_debug:
                 debug_info["step_1_query"] = query
-                
-            query_vector = embed_with_siliconflow(query)
+
+            active_context = self._resolve_inference_context({})
+            context_base_url = active_context.get('base_url')
+            context_llm_model = active_context.get('llm_model')
+            context_embedding_model = active_context.get('embedding_model')
+            context_reranker = active_context.get('reranker_model')
+
+            query_vector = embed_with_siliconflow(
+                query,
+                api_key=self.api_key,
+                model=context_embedding_model,
+                base_url=context_base_url,
+            )
             if do_debug:
                 debug_info["step_2_vector_generation"] = {
                     "vector_dimension": len(query_vector),
-                    "vector_sample": query_vector[:5]  # 只显示前5个元素
+                    "vector_sample": query_vector[:5],  # 只显示前5个元素
+                    "embedding_model": context_embedding_model,
+                    "base_url": context_base_url,
                 }
             
             # 2. 连接数据库（失败则降级为无RAG模式）
@@ -689,6 +896,20 @@ JSON中不允许出现尾随逗号
             scenarios = []
             if db_ok and conn is not None:
                 scenarios = self.search_clinical_scenarios(conn, query_vector, top_k=recall_k)
+                scope_info = self._extract_scope_info(scenarios)
+                scoped_context = self._resolve_inference_context(scope_info)
+                if scoped_context != active_context:
+                    if do_debug:
+                        debug_info["context_override"] = {
+                            "scope": scope_info,
+                            "resolved": scoped_context,
+                            "base": active_context,
+                        }
+                    active_context = scoped_context
+                    context_base_url = scoped_context.get('base_url', context_base_url)
+                    context_llm_model = scoped_context.get('llm_model', context_llm_model)
+                    context_embedding_model = scoped_context.get('embedding_model', context_embedding_model)
+                    context_reranker = scoped_context.get('reranker_model', context_reranker)
                 # 取出召回场景的推荐，增强rerank语料
                 try:
                     recall_ids = [s['semantic_id'] for s in scenarios]
@@ -708,6 +929,8 @@ JSON中不允许出现尾随逗号
                         alpha_topic=self.topic_boost,
                         alpha_kw=self.keyword_boost,
                         scenarios_with_recs=scenarios_with_recs_all,
+                        reranker_base_url=context_base_url,
+                        reranker_model=context_reranker,
                     )
                 except Exception as re:
                     logger.warning(f"场景重排失败: {re}")
@@ -851,10 +1074,20 @@ JSON中不允许出现尾随逗号
                     }
                     debug_info["step_6_prompt_length"] = len(prompt)
                     debug_info["step_6_prompt_preview"] = prompt[:500] + "..."
-            
+
             # 6. 调用LLM进行推理
+            if do_debug:
+                debug_info["step_6_context"] = {
+                    "llm_model": context_llm_model,
+                    "embedding_model": context_embedding_model,
+                    "reranker_model": context_reranker,
+                    "base_url": context_base_url,
+                }
             logger.info("调用LLM进行推理...")
-            llm_response = self.call_llm(prompt)
+            llm_response = self.call_llm(prompt, context={
+                'llm_model': context_llm_model,
+                'base_url': context_base_url,
+            })
 
             # 7. 解析LLM响应（若LLM不可用则回退到基于RAG候选的确定性结果）
             parsed_result = self.parse_llm_response(llm_response)
@@ -932,7 +1165,9 @@ JSON中不允许出现尾随逗号
                 "scenarios_with_recommendations": scenarios_with_recs,
                 "llm_recommendations": parsed_result,
                 "processing_time_ms": processing_time,
-                "model_used": self.llm_model,
+                "model_used": context_llm_model,
+                "embedding_model_used": context_embedding_model,
+                "reranker_model_used": context_reranker,
                 "similarity_threshold": current_threshold,
                 "max_similarity": max_similarity,
                 "is_low_similarity_mode": is_low_similarity,
@@ -1299,17 +1534,44 @@ print(json.dumps(out))
         alpha_topic: float = 0.2,
         alpha_kw: float = 0.05,
         scenarios_with_recs: Optional[List[Dict]] = None,
+        reranker_base_url: Optional[str] = None,
+        reranker_model: Optional[str] = None,
     ) -> List[Dict]:
         if not scenarios:
             return scenarios
-        # Try SiliconFlow reranker first
+        # Decide provider
+        provider = self.rerank_provider
+        base = (reranker_base_url or self.base_url or "").lower()
+        is_ollama = ("11434" in base) or ("ollama" in base)
+        if provider == "auto":
+            provider = "ollama" if is_ollama else "siliconflow"
         if self.use_reranker:
-            try:
-                reranked = self._siliconflow_rerank_scenarios(query, scenarios, scenarios_with_recs)
-                if reranked:
-                    return reranked
-            except Exception as e:
-                logger.warning(f"SiliconFlow reranker failed, fallback to keyword rerank: {e}")
+            if provider == "siliconflow":
+                try:
+                    reranked = self._siliconflow_rerank_scenarios(
+                        query,
+                        scenarios,
+                        scenarios_with_recs,
+                        base_url=reranker_base_url,
+                        model_id=reranker_model,
+                    )
+                    if reranked:
+                        return reranked
+                except Exception as e:
+                    logger.warning(f"SiliconFlow reranker failed, will try local/keyword fallback: {e}")
+            elif provider == "local" or provider == "ollama":
+                # For ollama, we currently use a local transformers cross-encoder as reliable backend
+                try:
+                    reranked = self._local_rerank_scenarios(
+                        query,
+                        scenarios,
+                        scenarios_with_recs,
+                        model_id=(reranker_model or self.reranker_model)
+                    )
+                    if reranked:
+                        return reranked
+                except Exception as e:
+                    logger.warning(f"Local reranker failed, fallback to keyword rerank: {e}")
         target_panels = target_panels or set()
         target_topics = target_topics or set()
         q = (query or "").lower()
@@ -1379,12 +1641,19 @@ print(json.dumps(out))
             ]
         }
 
-    def _siliconflow_rerank_scenarios(self, query: str, scenarios: List[Dict], scenarios_with_recs: Optional[List[Dict]] = None) -> List[Dict]:
+    def _siliconflow_rerank_scenarios(
+        self,
+        query: str,
+        scenarios: List[Dict],
+        scenarios_with_recs: Optional[List[Dict]] = None,
+        base_url: Optional[str] = None,
+        model_id: Optional[str] = None,
+    ) -> List[Dict]:
         """Use SiliconFlow rerank endpoint with BAAI/bge-reranker-v2-m3.
         Fallback gracefully if the endpoint/model is unavailable.
         """
-        api_key = os.getenv("SILICONFLOW_API_KEY")
-        base = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+        api_key = os.getenv("SILICONFLOW_API_KEY") or self.api_key
+        base = (base_url or os.getenv("SILICONFLOW_BASE_URL") or "https://api.siliconflow.cn/v1").rstrip("/")
         if not api_key:
             raise RuntimeError("SILICONFLOW_API_KEY not set")
         # Build richer docs: description + top rec names + truncated reasoning
@@ -1407,7 +1676,7 @@ print(json.dumps(out))
             txt = " | ".join(filter(None, [s.get('description_zh'), s.get('panel_name'), s.get('topic_name'), extras]))
             docs.append(txt or "")
         payload = {
-            "model": self.reranker_model,
+            "model": model_id or self.reranker_model,
             "query": query,
             "documents": docs,
             "top_n": len(docs)
@@ -1435,6 +1704,80 @@ print(json.dumps(out))
                 scored.append(s2)
         if not scored:
             return []
+        scored.sort(key=lambda x: x.get("_rerank_score", 0.0), reverse=True)
+        return scored
+
+    def _local_rerank_scenarios(
+        self,
+        query: str,
+        scenarios: List[Dict],
+        scenarios_with_recs: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
+    ) -> List[Dict]:
+        """Use local transformers cross-encoder (sentence-transformers) for reranking.
+        Default model: BAAI/bge-reranker-v2-m3
+        """
+        # Prefer sentence-transformers; fallback to pure transformers
+        use_st = True
+        try:
+            from sentence_transformers import CrossEncoder  # type: ignore
+        except Exception:
+            use_st = False
+        # Build docs same as SF path
+        rec_map = {}
+        if scenarios_with_recs:
+            for sc in scenarios_with_recs:
+                recs = sc.get('recommendations') or []
+                parts = []
+                for r in recs[:3]:
+                    name = r.get('procedure_name_zh') or ''
+                    reason = r.get('reasoning_zh') or ''
+                    if len(reason) > 160:
+                        reason = reason[:160] + '...'
+                    parts.append(f"{name}:{reason}")
+                rec_map[sc.get('scenario_id')] = " ; ".join(parts)
+        docs = []
+        for s in scenarios:
+            sid = s.get('semantic_id')
+            extras = rec_map.get(sid, '')
+            txt = " | ".join(filter(None, [s.get('description_zh'), s.get('panel_name'), s.get('topic_name'), extras]))
+            docs.append(txt or "")
+        # Map model id if an Ollama-like id specified
+        hf_model = model_id or self.reranker_model or "BAAI/bge-reranker-v2-m3"
+        if "/" in hf_model and hf_model.lower().startswith("dengcao/"):
+            hf_model = "BAAI/bge-reranker-v2-m3"
+        # Load and predict
+        if use_st:
+            ce = CrossEncoder(hf_model)
+            pairs = [(query, d) for d in docs]
+            scores = ce.predict(pairs)
+        else:
+            # transformers fallback
+            import torch
+            from transformers import AutoTokenizer, AutoModelForSequenceClassification  # type: ignore
+            tok = AutoTokenizer.from_pretrained(hf_model)
+            model = AutoModelForSequenceClassification.from_pretrained(hf_model)
+            model.eval()
+            scores = []
+            for d in docs:
+                with torch.no_grad():
+                    inputs = tok(query, d, return_tensors='pt', truncation=True, max_length=512)
+                    logits = model(**inputs).logits
+                    # map to [0,1]
+                    s = torch.sigmoid(logits.squeeze())
+                    try:
+                        scores.append(float(s.item()))
+                    except Exception:
+                        scores.append(0.0)
+        # Map back to scenarios
+        scored = []
+        for i, s in enumerate(scenarios):
+            s2 = dict(s)
+            try:
+                s2["_rerank_score"] = float(scores[i])
+            except Exception:
+                s2["_rerank_score"] = 0.0
+            scored.append(s2)
         scored.sort(key=lambda x: x.get("_rerank_score", 0.0), reverse=True)
         return scored
 

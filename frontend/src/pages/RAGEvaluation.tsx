@@ -175,27 +175,11 @@ const RAGEvaluation: React.FC = () => {
     })()
   }, [])
 
+  // 移除“占位滚动条”模拟，避免误导；统一使用异步模式展示真实进度
   useEffect(() => {
     if (!ragasSyncInProgress) {
       setRagasSyncProgress(0)
-      return
     }
-
-    setRagasSyncProgress(prev => (prev > 0 ? prev : 5))
-    const timer = setInterval(() => {
-      setRagasSyncProgress(prev => {
-        const next = Math.min(95, prev + Math.max(1, Math.round((95 - prev) / 5)))
-        setRagasStatus(current => {
-          if (current && current.status === 'processing') {
-            return { ...current, progress: next }
-          }
-          return current
-        })
-        return next
-      })
-    }, 800)
-
-    return () => clearInterval(timer)
   }, [ragasSyncInProgress])
   const llmModels = ragasLLMOptions.length ? ragasLLMOptions : [ { value: 'Qwen/Qwen2.5-32B-Instruct', label: 'Qwen/Qwen2.5-32B-Instruct (SiliconFlow)' } ]
 
@@ -386,28 +370,24 @@ const RAGEvaluation: React.FC = () => {
         }
       })
 
-      if (response.data && response.data.tasks) {
-        // 转换历史数据格式
-        const historyResults: EvaluationResult[] = response.data.tasks.map((task: any) => ({
-          question_id: task.task_id,
-          query: task.task_name || '历史评测任务',
-          ground_truth: '',
-          answer: '',
-          response_time: 0,
-          trace: {},
-          timestamp: task.created_at,
-          model: task.model_name || 'unknown',
-          source: 'history',
-          ragas_scores: task.summary || {},
-          ragas_evaluated: task.status === 'completed'
-        }))
+      const items = response.data?.items || []
+      const historyResults: EvaluationResult[] = items.map((task: any) => ({
+        question_id: task.task_id,
+        query: task.task_name || '历史评测任务',
+        ground_truth: '',
+        answer: '',
+        response_time: 0,
+        trace: {},
+        timestamp: task.created_at,
+        model: task.model_name || 'unknown',
+        source: 'history',
+        ragas_scores: undefined as any,
+        status: (task.status || 'pending')
+      }))
 
-        setHistoryData(historyResults)
-        message.success(`成功加载 ${historyResults.length} 条历史记录`)
-      } else {
-        setHistoryData([])
-        message.info('暂无历史评测记录')
-      }
+      setHistoryData(historyResults)
+      setHistoryVisible(true)
+      message.success(`成功加载 ${historyResults.length} 条历史记录`)
     } catch (error: any) {
       console.error('加载历史数据失败:', error)
       message.error('加载历史数据失败：' + (error.response?.data?.detail || error.message))
@@ -433,7 +413,6 @@ const RAGEvaluation: React.FC = () => {
         }
       ]
       setHistoryData(mockHistory)
-
       setHistoryVisible(true)
     }
   }
@@ -506,14 +485,21 @@ const RAGEvaluation: React.FC = () => {
         message.warning(`已过滤 ${testCases.length - sanitizedCases.length} 条无效用例（非字符串或为空）`)
       }
 
+      // 计算本次有效评测总数（若指定 data_count>0 则取其与可用用例数的较小值）
+      const limit = typeof params?.data_count === 'number' && params.data_count > 0
+        ? Math.min(params.data_count, sanitizedCases.length)
+        : sanitizedCases.length
+
+      // 初始化前端进度（异步/同步均显示总数，避免出现 0/0）
+      setRagasStatus({
+        status: 'processing',
+        progress: isAsync ? 0 : undefined,
+        completed_cases: 0,
+        failed_cases: 0,
+        total: limit,
+      })
       if (!isAsync) {
-        setRagasStatus({
-          status: 'processing',
-          progress: 0,
-          completed_cases: 0,
-          failed_cases: 0,
-          total: sanitizedCases.length,
-        })
+        // 同步模式：使用占位进度条展示“活动中”效果
         setRagasSyncProgress(5)
       }
 
@@ -540,13 +526,13 @@ const RAGEvaluation: React.FC = () => {
         setRagasResults(response.data.results || [])
         if (!isAsync) {
           const completedCount = Array.isArray(response.data.results) ? response.data.results.length : sanitizedCases.length
-          setRagasStatus({
+          setRagasStatus(prev => ({
             status: 'completed',
             progress: 100,
             completed_cases: completedCount,
             failed_cases: 0,
-            total: sanitizedCases.length,
-          })
+            total: prev?.total ?? sanitizedCases.length,
+          }))
           setRagasSyncProgress(100)
         }
         if (response.data.output_filename) {
@@ -589,13 +575,13 @@ const RAGEvaluation: React.FC = () => {
       }
       message.error('RAGAS评估失败：' + msg)
       if (!isAsync) {
-        setRagasStatus({
+        setRagasStatus(prev => ({
           status: 'failed',
           progress: 100,
           completed_cases: 0,
-          failed_cases: sanitizedCases.length,
-          total: sanitizedCases.length,
-        })
+          failed_cases: (prev?.total ?? sanitizedCases.length),
+          total: prev?.total ?? sanitizedCases.length,
+        }))
         setRagasSyncProgress(100)
       }
       throw new Error(msg)
@@ -617,9 +603,12 @@ const RAGEvaluation: React.FC = () => {
           completed_cases: status.completed_cases,
           failed_cases: status.failed_cases,
           status: status.status,
-          total: prev?.total ?? (typeof status.completed_cases === 'number' && typeof status.failed_cases === 'number'
-            ? status.completed_cases + status.failed_cases
-            : undefined),
+          total: prev?.total
+            ?? (typeof status.total === 'number' ? status.total : undefined)
+            ?? (typeof status.total_cases === 'number' ? status.total_cases : undefined)
+            ?? (typeof status.completed_cases === 'number' && typeof status.failed_cases === 'number'
+                  ? status.completed_cases + status.failed_cases
+                  : undefined),
         }))
 
         if (status.status === 'completed') {
@@ -983,6 +972,9 @@ const RAGEvaluation: React.FC = () => {
       record?.metadata?.rag_result?.trace?.llm_parsed?.recommendations,
       record?.metadata?.trace?.llm_parsed?.recommendations,
       record?.metadata?.rag_result?.llm_parsed?.recommendations,
+      // 回退到场景推荐（非LLM选择，但包含检查项目数据）
+      record?.trace?.scenarios_with_recommendations?.[0]?.recommendations,
+      record?.metadata?.rag_result?.scenarios_with_recommendations?.[0]?.recommendations,
     ]
     for (const item of candidates) {
       const normalized = normalizeRecommendations(item)
@@ -992,6 +984,25 @@ const RAGEvaluation: React.FC = () => {
     }
     return []
   }
+
+  // 简单的结果持久化，避免页面意外刷新后丢失
+  useEffect(() => {
+    try {
+      const payload = JSON.stringify({ ragasResults, ragasStatus })
+      localStorage.setItem('acrac_ragas_results_cache', payload)
+    } catch (e) {}
+  }, [ragasResults, ragasStatus])
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('acrac_ragas_results_cache')
+      if (v) {
+        const obj = JSON.parse(v)
+        if (Array.isArray(obj?.ragasResults)) setRagasResults(obj.ragasResults)
+        if (obj?.ragasStatus) setRagasStatus(obj.ragasStatus)
+      }
+    } catch (e) {}
+  }, [])
 
   const resolveAnswerText = (record: any): string => {
     const sources = [
@@ -1394,7 +1405,13 @@ const RAGEvaluation: React.FC = () => {
               </div>
             )}
             <Progress
-              percent={typeof ragasStatus?.progress === 'number' ? ragasStatus.progress : ragasSyncProgress}
+              percent={
+                ragasSyncInProgress
+                  ? ragasSyncProgress
+                  : (typeof ragasStatus?.progress === 'number'
+                      ? (ragasStatus.progress === 0 && (ragasStatus?.status === 'processing') ? 1 : ragasStatus.progress)
+                      : 0)
+              }
               status="active"
             />
             <div style={{ marginTop: 8 }}>

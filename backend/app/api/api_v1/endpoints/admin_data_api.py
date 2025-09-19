@@ -1,20 +1,22 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 from pathlib import Path
 import subprocess
 import time
 import os
 import re
+import json
 from app.core.config import settings
 
 router = APIRouter()
 
-# 统一定位到 backend 目录（更稳健的层级）
+# 统一定位到 backend 根目录（容器内为 /app，本地为 backend/）
 BACKEND_DIR = Path(__file__).resolve().parents[4]
 UPLOAD_DIR = BACKEND_DIR / 'uploads'
 SCRIPTS_DIR = BACKEND_DIR / 'scripts'
 REGISTRY_PATH = BACKEND_DIR / 'config' / 'models_registry.json'
+CONTEXTS_PATH = BACKEND_DIR / 'config' / 'model_contexts.json'
 
 
 class ImportRequest(BaseModel):
@@ -22,6 +24,8 @@ class ImportRequest(BaseModel):
     mode: str = Field('clear', description='导入模式: clear(清空重建)/add(追加)')
     embedding_model: Optional[str] = Field(None, description='SiliconFlow embedding model id, e.g., BAAI/bge-m3')
     llm_model: Optional[str] = Field(None, description='LLM model id used in service')
+    embedding_dim: Optional[int] = Field(None, description='向量维度（如 1024 / 2560）。不传则自动探测或使用默认1024')
+    base_url: Optional[str] = Field(None, description='嵌入API Base URL（SiliconFlow或Ollama），例如 https://api.siliconflow.cn/v1 或 http://localhost:11434/v1')
 
 
 class ImportResponse(BaseModel):
@@ -31,16 +35,40 @@ class ImportResponse(BaseModel):
     metrics: Optional[Dict[str, Any]] = None
 
 
+class ContextConfig(BaseModel):
+    """统一描述一个上下文的模型配置."""
+
+    llm_model: Optional[str] = None
+    embedding_model: Optional[str] = None
+    reranker_model: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+class ScenarioBinding(BaseModel):
+    """特定应用场景 (panel/topic/scenario/custom) 的模型覆盖."""
+
+    scope_type: str = Field(..., description='panel/topic/scenario/custom')
+    scope_id: str = Field(..., description='与场景绑定的唯一ID')
+    scope_label: Optional[str] = Field(None, description='展示名称，便于前端显示')
+    inference: Optional[ContextConfig] = Field(None, description='推理阶段覆盖配置')
+    evaluation: Optional[ContextConfig] = Field(None, description='评测阶段覆盖配置')
+
+
 class ModelsConfig(BaseModel):
     embedding_model: Optional[str] = None
     llm_model: Optional[str] = None
     reranker_model: Optional[str] = None
     base_url: Optional[str] = None
+    rerank_provider: Optional[str] = None  # auto | siliconflow | local | ollama
     siliconflow_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     # Defaults for RAGAS (optional)
     ragas_llm_model: Optional[str] = None
     ragas_embedding_model: Optional[str] = None
+
+    # 新结构：上下文配置 + 场景覆盖
+    contexts: Optional[Dict[str, ContextConfig]] = None
+    scenario_overrides: Optional[List[ScenarioBinding]] = None
 
 
 class ModelEntry(BaseModel):
@@ -58,6 +86,104 @@ class ModelsRegistry(BaseModel):
     llms: list[ModelEntry] = []
     embeddings: list[ModelEntry] = []
     rerankers: list[ModelEntry] = []
+
+
+# —— 系统状态汇总 ——
+@router.get('/system/status', summary='系统状态汇总（API/DB/Embedding/LLM/Reranker）')
+async def system_status() -> Dict[str, Any]:
+    import requests
+    import time
+    status: Dict[str, Any] = { 'ts': time.time() }
+
+    # API 自身健康
+    try:
+        status['api'] = { 'status': 'ok', 'service': 'backend' }
+    except Exception as e:
+        status['api'] = { 'status': 'error', 'error': str(e) }
+
+    # 数据库健康（计数与连接）
+    try:
+        import psycopg2
+        cfg = {
+            'host': os.getenv('PGHOST','localhost'),
+            'port': int(os.getenv('PGPORT','5432')),
+            'database': os.getenv('PGDATABASE','acrac_db'),
+            'user': os.getenv('PGUSER','postgres'),
+            'password': os.getenv('PGPASSWORD','password'),
+        }
+        conn = psycopg2.connect(**cfg)
+        cur = conn.cursor()
+        def cnt(sql: str) -> int:
+            cur.execute(sql); return cur.fetchone()[0]
+        db = {
+            'status': 'ok',
+            'tables': {
+                'panels': cnt('SELECT COUNT(*) FROM panels'),
+                'topics': cnt('SELECT COUNT(*) FROM topics'),
+                'clinical_scenarios': cnt('SELECT COUNT(*) FROM clinical_scenarios'),
+                'procedure_dictionary': cnt('SELECT COUNT(*) FROM procedure_dictionary'),
+                'clinical_recommendations': cnt('SELECT COUNT(*) FROM clinical_recommendations'),
+            }
+        }
+        conn.close()
+        status['db'] = db
+    except Exception as e:
+        status['db'] = { 'status': 'error', 'error': str(e) }
+
+    # 读取推理上下文（模型与base_url）
+    try:
+        stored = _load_contexts_payload()
+        ctx = (stored.get('contexts') or {}).get('inference') or {}
+        base_url = os.getenv('SILICONFLOW_BASE_URL') or ctx.get('base_url') or ''
+        inf = {
+            'llm_model': os.getenv('SILICONFLOW_LLM_MODEL', ctx.get('llm_model', '')),
+            'embedding_model': os.getenv('SILICONFLOW_EMBEDDING_MODEL', ctx.get('embedding_model', '')),
+            'reranker_model': os.getenv('RERANKER_MODEL', ctx.get('reranker_model', 'BAAI/bge-reranker-v2-m3')),
+            'base_url': base_url,
+        }
+    except Exception:
+        inf = {
+            'llm_model': os.getenv('SILICONFLOW_LLM_MODEL', ''),
+            'embedding_model': os.getenv('SILICONFLOW_EMBEDDING_MODEL', ''),
+            'reranker_model': os.getenv('RERANKER_MODEL', ''),
+            'base_url': os.getenv('SILICONFLOW_BASE_URL') or '',
+        }
+
+    # 构造模型条目进行连通性检查（复用 check_single_model 逻辑）
+    async def _check(kind: str, model: str, base: str, provider_hint: str = 'siliconflow'):
+        entry = ModelEntry(provider=provider_hint, kind=kind, model=model, base_url=base, api_key_env='SILICONFLOW_API_KEY')
+        # 提示：如果是ollama base，将provider固定为ollama
+        b = (base or '').lower()
+        if ('11434' in b) or ('ollama' in b):
+            entry.provider = 'ollama'
+        return await check_single_model(entry)
+
+    # Embedding
+    try:
+        if inf['embedding_model']:
+            status['embedding'] = await _check('embedding', inf['embedding_model'], inf['base_url'])
+        else:
+            status['embedding'] = { 'status': 'unknown' }
+    except Exception as e:
+        status['embedding'] = { 'status': 'error', 'error': str(e) }
+    # LLM
+    try:
+        if inf['llm_model']:
+            status['llm'] = await _check('llm', inf['llm_model'], inf['base_url'])
+        else:
+            status['llm'] = { 'status': 'unknown' }
+    except Exception as e:
+        status['llm'] = { 'status': 'error', 'error': str(e) }
+    # Reranker
+    try:
+        if inf['reranker_model']:
+            status['reranker'] = await _check('reranker', inf['reranker_model'], inf['base_url'])
+        else:
+            status['reranker'] = { 'status': 'unknown' }
+    except Exception as e:
+        status['reranker'] = { 'status': 'error', 'error': str(e) }
+
+    return status
 
 @router.get('/validate', summary='数据合规性校验（表计数、向量覆盖、孤儿推荐）')
 async def validate_data() -> Dict[str, Any]:
@@ -120,16 +246,20 @@ async def upload_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
 @router.post('/import', response_model=ImportResponse, summary='从CSV导入/重建数据（同步执行，可能耗时）')
 async def import_csv(req: ImportRequest) -> ImportResponse:
     try:
-        # Enforce presence of API key to avoid building with random embeddings
-        if not (os.getenv('SILICONFLOW_API_KEY') or settings.SILICONFLOW_API_KEY):
-            raise HTTPException(status_code=400, detail='SILICONFLOW_API_KEY 未配置。为保证向量准确性，请先在 backend/.env 设置该Key。')
+        # 允许两种来源：SiliconFlow（需API Key）或本地Ollama（/v1/embeddings，无需Key）
+        has_sf_key = bool(os.getenv('SILICONFLOW_API_KEY') or settings.SILICONFLOW_API_KEY)
+        has_ollama = bool(os.getenv('OLLAMA_BASE_URL'))
+        # 请求中显式传入 base_url 也可用作判断
+        req_base = (req.base_url or '').lower()
+        if not (has_sf_key or has_ollama or ('ollama' in req_base) or ('11434' in req_base)):
+            raise HTTPException(status_code=400, detail='缺少嵌入服务配置：请在 .env 设置 SILICONFLOW_API_KEY 或 OLLAMA_BASE_URL，或在本次请求中提供 base_url 为 http://localhost:11434/v1')
         csv_path = req.csv_path
         if not csv_path:
             raise HTTPException(status_code=400, detail='csv_path 必填（先上传或提供服务器绝对路径）')
         csv = Path(csv_path)
         if not csv.exists():
             raise HTTPException(status_code=400, detail='csv_path 不存在')
-        log_dir = Path(__file__).resolve().parents[5] / 'backend' / 'logs'
+        log_dir = BACKEND_DIR / 'logs'
         log_dir.mkdir(parents=True, exist_ok=True)
         ts = time.strftime('%Y%m%d_%H%M%S')
         log_path = log_dir / f'import_{ts}.log'
@@ -149,6 +279,16 @@ async def import_csv(req: ImportRequest) -> ImportResponse:
             env['SILICONFLOW_EMBEDDING_MODEL'] = req.embedding_model
         if req.llm_model:
             env['SILICONFLOW_LLM_MODEL'] = req.llm_model
+        if req.embedding_dim:
+            env['EMBEDDING_DIM'] = str(req.embedding_dim)
+        if req.base_url:
+            env['SILICONFLOW_BASE_URL'] = req.base_url
+            env['OLLAMA_BASE_URL'] = req.base_url
+        # 兜底：如选择 Ollama 模型但未切换 Base URL，提前报错
+        if req.embedding_model and ('qwen' in req.embedding_model.lower() or 'ollama' in req.embedding_model.lower()):
+            base = (req.base_url or os.getenv('SILICONFLOW_BASE_URL') or '').lower()
+            if not base or ('siliconflow' in base and '11434' not in base and 'ollama' not in base):
+                raise HTTPException(status_code=400, detail='检测到选择了 Ollama 嵌入模型，但 Base URL 仍指向 SiliconFlow。请设置为 http://host.docker.internal:11434/v1 或宿主机 Ollama 地址。')
 
         with log_path.open('wb') as logf:
             proc = subprocess.Popen(args, stdout=logf, stderr=logf, env=env, cwd=str(SCRIPTS_DIR))
@@ -207,20 +347,72 @@ async def import_csv(req: ImportRequest) -> ImportResponse:
 async def get_models_config() -> Dict[str, Any]:
     def has(k: str) -> bool:
         return bool(os.getenv(k))
+    stored = _load_contexts_payload()
+    stored_contexts = stored.get('contexts') or {}
+    scenario_overrides = stored.get('scenario_overrides') or []
+
+    inference_defaults = stored_contexts.get('inference') or {}
+    evaluation_defaults = stored_contexts.get('evaluation') or {}
+
+    def _default_base_for_model(model: str) -> str:
+        if model and ':' in str(model):
+            # 形如 qwen2.5:32b -> 优先 Ollama
+            return os.getenv('OLLAMA_BASE_URL') or os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
+        return os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
+
+    # Inference context
+    inf_llm = os.getenv('SILICONFLOW_LLM_MODEL', inference_defaults.get('llm_model', ''))
+    inf_emb = os.getenv('SILICONFLOW_EMBEDDING_MODEL', inference_defaults.get('embedding_model', ''))
+    inf_base = os.getenv('SILICONFLOW_BASE_URL', inference_defaults.get('base_url', _default_base_for_model(inf_llm)))
+    inference_ctx = {
+        'llm_model': inf_llm,
+        'embedding_model': inf_emb,
+        'reranker_model': os.getenv('RERANKER_MODEL', inference_defaults.get('reranker_model', 'BAAI/bge-reranker-v2-m3')),
+        'base_url': inf_base,
+    }
+
+    # Evaluation (RAGAS) context
+    eva_llm = os.getenv('RAGAS_DEFAULT_LLM_MODEL', evaluation_defaults.get('llm_model', inference_ctx['llm_model']))
+    eva_emb = os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL', evaluation_defaults.get('embedding_model', inference_ctx['embedding_model']))
+    # 若显式设置了 RAGAS_DEFAULT_BASE_URL 则使用；否则当 llm 形如 qwen2.5:32b 时优先 OLLAMA_BASE_URL
+    if os.getenv('RAGAS_DEFAULT_BASE_URL'):
+        eva_base = os.getenv('RAGAS_DEFAULT_BASE_URL')
+    elif eva_llm and ':' in str(eva_llm) and os.getenv('OLLAMA_BASE_URL'):
+        eva_base = os.getenv('OLLAMA_BASE_URL')
+    else:
+        eva_base = evaluation_defaults.get('base_url', _default_base_for_model(eva_llm))
+    evaluation_ctx = {
+        'llm_model': eva_llm,
+        'embedding_model': eva_emb,
+        'reranker_model': os.getenv('RAGAS_DEFAULT_RERANKER_MODEL', evaluation_defaults.get('reranker_model')),
+        'base_url': eva_base,
+    }
+
+    contexts: Dict[str, Any] = {}
+    for name, ctx in stored_contexts.items():
+        if name not in ('inference', 'evaluation') and isinstance(ctx, dict):
+            contexts[name] = ctx
+    contexts['inference'] = inference_ctx
+    contexts['evaluation'] = evaluation_ctx
+
     return {
-        'embedding_model': os.getenv('SILICONFLOW_EMBEDDING_MODEL', ''),
-        'llm_model': os.getenv('SILICONFLOW_LLM_MODEL', ''),
-        'reranker_model': os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3'),
-        'base_url': os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1'),
+        # 兼容旧字段
+        'embedding_model': inference_ctx['embedding_model'],
+        'llm_model': inference_ctx['llm_model'],
+        'reranker_model': inference_ctx['reranker_model'],
+        'base_url': inference_ctx['base_url'],
+        'rerank_provider': os.getenv('RERANK_PROVIDER', 'auto'),
         'keys': {
             'siliconflow_api_key': has('SILICONFLOW_API_KEY'),
             'openai_api_key': has('OPENAI_API_KEY'),
         },
-        'providers': ['siliconflow','openai','local'],
+        'providers': ['siliconflow', 'openai', 'local'],
         'ragas_defaults': {
-            'llm_model': os.getenv('RAGAS_DEFAULT_LLM_MODEL', ''),
-            'embedding_model': os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL', '')
-        }
+            'llm_model': evaluation_ctx['llm_model'],
+            'embedding_model': evaluation_ctx['embedding_model'],
+        },
+        'contexts': contexts,
+        'scenario_overrides': scenario_overrides,
     }
 
 
@@ -237,14 +429,32 @@ async def check_models_connectivity(context: Optional[str] = None) -> Dict[str, 
     from app.services.rag_llm_recommendation_service import embed_with_siliconflow
 
     api_key = os.getenv('SILICONFLOW_API_KEY') or settings.SILICONFLOW_API_KEY
-    base_url = os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
-    if (context or '').lower() == 'ragas':
-        llm_model = os.getenv('RAGAS_DEFAULT_LLM_MODEL') or os.getenv('SILICONFLOW_LLM_MODEL') or settings.SILICONFLOW_LLM_MODEL
-        emb_model = os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL') or os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
+    stored = _load_contexts_payload()
+    stored_contexts = stored.get('contexts') or {}
+
+    ctx_name = (context or '').strip().lower()
+    # Map common aliases
+    if ctx_name in ('evaluation', 'ragas'):
+        llm_model = os.getenv('RAGAS_DEFAULT_LLM_MODEL') or stored_contexts.get('evaluation', {}).get('llm_model') or os.getenv('SILICONFLOW_LLM_MODEL') or settings.SILICONFLOW_LLM_MODEL
+        emb_model = os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL') or stored_contexts.get('evaluation', {}).get('embedding_model') or os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
+        reranker_model = os.getenv('RAGAS_DEFAULT_RERANKER_MODEL') or stored_contexts.get('evaluation', {}).get('reranker_model') or os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3')
+        # 若模型名称疑似 Ollama，则优先使用 OLLAMA_BASE_URL
+        prefer_ollama = (llm_model and ':' in str(llm_model))
+        if prefer_ollama and os.getenv('OLLAMA_BASE_URL'):
+            base_url = os.getenv('OLLAMA_BASE_URL')
+        else:
+            base_url = os.getenv('RAGAS_DEFAULT_BASE_URL') or stored_contexts.get('evaluation', {}).get('base_url') or os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
+    elif ctx_name and ctx_name in stored_contexts:
+        c = stored_contexts.get(ctx_name) or {}
+        llm_model = c.get('llm_model') or os.getenv('SILICONFLOW_LLM_MODEL') or settings.SILICONFLOW_LLM_MODEL
+        emb_model = c.get('embedding_model') or os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
+        reranker_model = c.get('reranker_model') or os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3')
+        base_url = c.get('base_url') or os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
     else:
         llm_model = os.getenv('SILICONFLOW_LLM_MODEL') or settings.SILICONFLOW_LLM_MODEL
         emb_model = os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
-    reranker_model = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3')
+        reranker_model = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3')
+        base_url = os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
 
     out: Dict[str, Any] = {
         'env': {
@@ -259,7 +469,11 @@ async def check_models_connectivity(context: Optional[str] = None) -> Dict[str, 
     # LLM check
     try:
         t0 = time.time()
-        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        # Ollama 端点通常不需要有效 key
+        api_key_llm = api_key
+        if base_url and (('11434' in base_url) or ('ollama' in base_url.lower())):
+            api_key_llm = os.getenv('OLLAMA_API_KEY') or 'ollama'
+        client = openai.OpenAI(api_key=api_key_llm, base_url=base_url) if base_url else openai.OpenAI(api_key=api_key_llm)
         resp = client.chat.completions.create(
             model=llm_model,
             messages=[{"role": "user", "content": "ping"}],
@@ -274,16 +488,40 @@ async def check_models_connectivity(context: Optional[str] = None) -> Dict[str, 
 
     # Embedding check
     try:
-        vec = embed_with_siliconflow('ping', api_key=api_key, model=emb_model)
+        vec = embed_with_siliconflow('ping', api_key=api_key, model=emb_model, base_url=base_url)
         dim = len(vec) if isinstance(vec, list) else 0
         ok = dim >= 128  # 宽松判定
         out['embedding'] = {'status': 'ok' if ok else 'warning', 'model': emb_model, 'dimension': dim, 'context': context or 'rag_llm'}
     except Exception as e:
         out['embedding'] = {'status': 'error', 'error': str(e), 'model': emb_model, 'context': context or 'rag_llm'}
 
-    # Reranker check（可选）
+    # Reranker check（SiliconFlow 或本地 CrossEncoder）
     try:
-        if api_key and base_url:
+        if base_url and (('11434' in base_url) or ('ollama' in base_url.lower())):
+            # 尝试本地 CrossEncoder（优先 sentence-transformers，其次 transformers）
+            test_model = reranker_model or 'BAAI/bge-reranker-v2-m3'
+            if '/' in test_model and test_model.lower().startswith('dengcao/'):
+                test_model = 'BAAI/bge-reranker-v2-m3'
+            try:
+                try:
+                    from sentence_transformers import CrossEncoder  # type: ignore
+                    ce = CrossEncoder(test_model)
+                    _ = ce.predict([('headache', 'sudden thunderclap headache'), ('headache', 'mild chronic dull headache')])
+                    out['reranker'] = {'status': 'ok', 'model': reranker_model or 'BAAI/bge-reranker-v2-m3', 'provider': 'local-st'}
+                except Exception:
+                    import torch
+                    from transformers import AutoTokenizer, AutoModelForSequenceClassification  # type: ignore
+                    tok = AutoTokenizer.from_pretrained(test_model)
+                    model = AutoModelForSequenceClassification.from_pretrained(test_model)
+                    model.eval()
+                    with torch.no_grad():
+                        inputs = tok('headache', 'sudden thunderclap headache', return_tensors='pt', truncation=True, max_length=512)
+                        logits = model(**inputs).logits
+                        _ = float(torch.sigmoid(logits.squeeze()).item())
+                    out['reranker'] = {'status': 'ok', 'model': reranker_model or 'BAAI/bge-reranker-v2-m3', 'provider': 'local-hf'}
+            except Exception as ee:
+                out['reranker'] = {'status': 'warning', 'model': reranker_model, 'error': f'local rerank unavailable: {ee}'}
+        elif api_key and base_url:
             url = f"{base_url.rstrip('/')}/rerank"
             payload = {
                 'model': reranker_model,
@@ -332,31 +570,130 @@ def _save_registry(reg: ModelsRegistry):
     REGISTRY_PATH.write_text(json.dumps(reg.model_dump(), ensure_ascii=False, indent=2), encoding='utf-8')
 
 
+def _load_contexts_payload() -> Dict[str, Any]:
+    if not CONTEXTS_PATH.exists():
+        return {'contexts': {}, 'scenario_overrides': []}
+    try:
+        return json.loads(CONTEXTS_PATH.read_text(encoding='utf-8'))
+    except Exception:
+        return {'contexts': {}, 'scenario_overrides': []}
+
+
+def _save_contexts_payload(payload: Dict[str, Any]) -> None:
+    CONTEXTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONTEXTS_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
 @router.post('/models/config', summary='更新模型配置（写入.env并设置当前进程env）')
 async def set_models_config(cfg: ModelsConfig) -> Dict[str, Any]:
     try:
-        if cfg.embedding_model is not None: os.environ['SILICONFLOW_EMBEDDING_MODEL'] = cfg.embedding_model
-        if cfg.llm_model is not None: os.environ['SILICONFLOW_LLM_MODEL'] = cfg.llm_model
-        if cfg.reranker_model is not None: os.environ['RERANKER_MODEL'] = cfg.reranker_model
-        if cfg.base_url is not None: os.environ['SILICONFLOW_BASE_URL'] = cfg.base_url
-        if cfg.siliconflow_api_key is not None: os.environ['SILICONFLOW_API_KEY'] = cfg.siliconflow_api_key
-        if cfg.openai_api_key is not None: os.environ['OPENAI_API_KEY'] = cfg.openai_api_key
+        incoming_contexts: Dict[str, Dict[str, Any]] = {}
+        if cfg.contexts:
+            for name, ctx in cfg.contexts.items():
+                if isinstance(ctx, ContextConfig):
+                    incoming_contexts[name] = ctx.model_dump(exclude_none=True)
+                elif isinstance(ctx, dict):
+                    incoming_contexts[name] = {k: v for k, v in ctx.items() if v is not None}
 
-        env_path = Path(__file__).resolve().parents[5] / 'backend' / '.env'
+        # 兼容旧字段写入 inference/evaluation
+        inf_ctx = dict(incoming_contexts.get('inference', {}))
+        eval_ctx = dict(incoming_contexts.get('evaluation', {}))
+
+        if cfg.embedding_model is not None:
+            inf_ctx['embedding_model'] = cfg.embedding_model
+        if cfg.llm_model is not None:
+            inf_ctx['llm_model'] = cfg.llm_model
+        if cfg.reranker_model is not None:
+            inf_ctx['reranker_model'] = cfg.reranker_model
+        if cfg.base_url is not None:
+            inf_ctx['base_url'] = cfg.base_url
+
+        if cfg.ragas_llm_model is not None:
+            eval_ctx['llm_model'] = cfg.ragas_llm_model
+        if cfg.ragas_embedding_model is not None:
+            eval_ctx['embedding_model'] = cfg.ragas_embedding_model
+
+        contexts_to_store: Dict[str, Dict[str, Any]] = dict(incoming_contexts)
+        if inf_ctx:
+            contexts_to_store['inference'] = inf_ctx
+        if eval_ctx:
+            contexts_to_store['evaluation'] = eval_ctx
+
+        current_payload = _load_contexts_payload()
+        stored_contexts = current_payload.get('contexts') or {}
+        stored_overrides = current_payload.get('scenario_overrides') or []
+
+        updated_contexts = dict(stored_contexts)
+        for name, ctx in contexts_to_store.items():
+            updated_contexts[name] = ctx
+
+        if cfg.scenario_overrides is not None:
+            overrides_payload = [item.model_dump(exclude_none=True) for item in cfg.scenario_overrides]
+        else:
+            overrides_payload = stored_overrides
+
+        # 更新进程环境变量
+        inference_for_env = updated_contexts.get('inference', {})
+        evaluation_for_env = updated_contexts.get('evaluation', {})
+
+        if 'embedding_model' in inference_for_env:
+            os.environ['SILICONFLOW_EMBEDDING_MODEL'] = inference_for_env.get('embedding_model', '')
+        if 'llm_model' in inference_for_env:
+            os.environ['SILICONFLOW_LLM_MODEL'] = inference_for_env.get('llm_model', '')
+        if 'reranker_model' in inference_for_env:
+            os.environ['RERANKER_MODEL'] = inference_for_env.get('reranker_model', '')
+        if 'base_url' in inference_for_env:
+            os.environ['SILICONFLOW_BASE_URL'] = inference_for_env.get('base_url', '')
+
+        if 'llm_model' in evaluation_for_env:
+            os.environ['RAGAS_DEFAULT_LLM_MODEL'] = evaluation_for_env.get('llm_model', '')
+        if 'embedding_model' in evaluation_for_env:
+            os.environ['RAGAS_DEFAULT_EMBEDDING_MODEL'] = evaluation_for_env.get('embedding_model', '')
+        if 'base_url' in evaluation_for_env:
+            os.environ['RAGAS_DEFAULT_BASE_URL'] = evaluation_for_env.get('base_url', '')
+        if 'reranker_model' in evaluation_for_env:
+            os.environ['RAGAS_DEFAULT_RERANKER_MODEL'] = evaluation_for_env.get('reranker_model', '')
+
+        if cfg.siliconflow_api_key is not None:
+            os.environ['SILICONFLOW_API_KEY'] = cfg.siliconflow_api_key
+        if cfg.openai_api_key is not None:
+            os.environ['OPENAI_API_KEY'] = cfg.openai_api_key
+        if cfg.rerank_provider is not None:
+            os.environ['RERANK_PROVIDER'] = cfg.rerank_provider
+
+        env_path = BACKEND_DIR / '.env'
         text = env_path.read_text(encoding='utf-8') if env_path.exists() else ''
-        for k, v in [
-            ('SILICONFLOW_EMBEDDING_MODEL', cfg.embedding_model),
-            ('SILICONFLOW_LLM_MODEL', cfg.llm_model),
-            ('RERANKER_MODEL', cfg.reranker_model),
-            ('SILICONFLOW_BASE_URL', cfg.base_url),
-            ('SILICONFLOW_API_KEY', cfg.siliconflow_api_key),
-            ('OPENAI_API_KEY', cfg.openai_api_key),
-            # RAGAS defaults
-            ('RAGAS_DEFAULT_LLM_MODEL', cfg.ragas_llm_model),
-            ('RAGAS_DEFAULT_EMBEDDING_MODEL', cfg.ragas_embedding_model),
-        ]:
-            text = _update_env(text, k, v)
+        env_updates: List[Tuple[str, Optional[str]]] = []
+        if 'embedding_model' in inference_for_env:
+            env_updates.append(('SILICONFLOW_EMBEDDING_MODEL', inference_for_env.get('embedding_model')))
+        if 'llm_model' in inference_for_env:
+            env_updates.append(('SILICONFLOW_LLM_MODEL', inference_for_env.get('llm_model')))
+        if 'reranker_model' in inference_for_env:
+            env_updates.append(('RERANKER_MODEL', inference_for_env.get('reranker_model')))
+        if 'base_url' in inference_for_env:
+            env_updates.append(('SILICONFLOW_BASE_URL', inference_for_env.get('base_url')))
+        if 'llm_model' in evaluation_for_env:
+            env_updates.append(('RAGAS_DEFAULT_LLM_MODEL', evaluation_for_env.get('llm_model')))
+        if 'embedding_model' in evaluation_for_env:
+            env_updates.append(('RAGAS_DEFAULT_EMBEDDING_MODEL', evaluation_for_env.get('embedding_model')))
+        if 'base_url' in evaluation_for_env:
+            env_updates.append(('RAGAS_DEFAULT_BASE_URL', evaluation_for_env.get('base_url')))
+        if 'reranker_model' in evaluation_for_env:
+            env_updates.append(('RAGAS_DEFAULT_RERANKER_MODEL', evaluation_for_env.get('reranker_model')))
+        if cfg.siliconflow_api_key is not None:
+            env_updates.append(('SILICONFLOW_API_KEY', cfg.siliconflow_api_key))
+        if cfg.openai_api_key is not None:
+            env_updates.append(('OPENAI_API_KEY', cfg.openai_api_key))
+        if cfg.rerank_provider is not None:
+            env_updates.append(('RERANK_PROVIDER', cfg.rerank_provider))
+        for key, value in env_updates:
+            text = _update_env(text, key, value)
         env_path.write_text(text, encoding='utf-8')
+
+        _save_contexts_payload({
+            'contexts': updated_contexts,
+            'scenario_overrides': overrides_payload,
+        })
         return {'ok': True, 'requires_restart': True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -376,6 +713,54 @@ async def reload_rag_service() -> Dict[str, Any]:
 @router.get('/models/registry', summary='获取模型库')
 async def get_models_registry() -> Dict[str, Any]:
     reg = _load_registry()
+    # 若注册表为空，尝试基于环境变量提供一次性“建议项”，避免冷启动后前端下拉无选项
+    if not (reg.llms or reg.embeddings or reg.rerankers):
+        suggest_llms: list[ModelEntry] = []
+        suggest_embs: list[ModelEntry] = []
+        # LLM: 优先 evaluation/inference 默认，再回退 SiliconFlow 默认
+        llm_model = os.getenv('RAGAS_DEFAULT_LLM_MODEL') or os.getenv('SILICONFLOW_LLM_MODEL') or ''
+        base_llm = None
+        if llm_model:
+            if ':' in llm_model and (os.getenv('OLLAMA_BASE_URL')):
+                base_llm = os.getenv('OLLAMA_BASE_URL')
+                suggest_llms.append(ModelEntry(
+                    id=f"ollama-llm-{llm_model.replace('/','_').replace(':','_')}",
+                    label=llm_model,
+                    provider='ollama', kind='llm', model=llm_model, base_url=base_llm,
+                    api_key_env=None
+                ))
+            else:
+                base_llm = os.getenv('SILICONFLOW_BASE_URL', settings.SILICONFLOW_BASE_URL)
+                suggest_llms.append(ModelEntry(
+                    id=f"siliconflow-llm-{llm_model.replace('/','_').replace(':','_')}",
+                    label=llm_model,
+                    provider='siliconflow', kind='llm', model=llm_model, base_url=base_llm,
+                    api_key_env='SILICONFLOW_API_KEY'
+                ))
+
+        # Embedding
+        emb_model = os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL') or os.getenv('SILICONFLOW_EMBEDDING_MODEL') or ''
+        base_emb = None
+        if emb_model:
+            if ':' in emb_model and (os.getenv('OLLAMA_BASE_URL')):
+                base_emb = os.getenv('OLLAMA_BASE_URL')
+                suggest_embs.append(ModelEntry(
+                    id=f"ollama-embedding-{emb_model.replace('/','_').replace(':','_')}",
+                    label=emb_model,
+                    provider='ollama', kind='embedding', model=emb_model, base_url=base_emb,
+                    api_key_env=None
+                ))
+            else:
+                base_emb = os.getenv('SILICONFLOW_BASE_URL', settings.SILICONFLOW_BASE_URL)
+                suggest_embs.append(ModelEntry(
+                    id=f"siliconflow-embedding-{emb_model.replace('/','_').replace(':','_')}",
+                    label=emb_model,
+                    provider='siliconflow', kind='embedding', model=emb_model, base_url=base_emb,
+                    api_key_env='SILICONFLOW_API_KEY'
+                ))
+
+        # 仅在完全为空时提供建议项（不落盘）
+        reg = ModelsRegistry(llms=suggest_llms, embeddings=suggest_embs, rerankers=[])
     # redact api_key
     def redact(items: list[ModelEntry]):
         out = []
@@ -419,6 +804,7 @@ async def check_single_model(entry: ModelEntry) -> Dict[str, Any]:
     import time
     import requests
     import openai
+    import re
     # resolve key
     api_key = entry.api_key
     if (not api_key) and entry.api_key_env:
@@ -429,6 +815,9 @@ async def check_single_model(entry: ModelEntry) -> Dict[str, Any]:
         api_key = os.getenv('OPENAI_API_KEY')
     if (not api_key) and entry.provider.lower() == 'dashscope':
         api_key = os.getenv('DASHSCOPE_API_KEY')
+    if (not api_key) and entry.provider.lower() == 'ollama':
+        # Ollama 的 OpenAI 兼容端点通常不校验key，但SDK需要一个占位符
+        api_key = os.getenv('OLLAMA_API_KEY') or 'ollama'
     prov = (entry.provider or '').lower()
     # Provider 默认 base_url
     default_base = None
@@ -443,6 +832,15 @@ async def check_single_model(entry: ModelEntry) -> Dict[str, Any]:
         # 阿里云达摩院 DashScope 兼容端点
         default_base = os.getenv('DASHSCOPE_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
     base_url = entry.base_url or default_base
+    # 规范化 Ollama base_url：去掉多余的 /rerank，确保以 /v1 结尾
+    if prov == 'ollama':
+        if base_url:
+            # 去除尾部 /rerank
+            base_url = re.sub(r"/+rerank/?$", "", base_url.rstrip('/'))
+        if not base_url:
+            base_url = 'http://localhost:11434/v1'
+        if not re.search(r"/v1/?$", base_url):
+            base_url = base_url.rstrip('/') + '/v1'
     out: Dict[str, Any] = {'kind': entry.kind, 'model': entry.model, 'provider': entry.provider, 'base_url': base_url}
     try:
         if entry.kind == 'llm':
@@ -458,12 +856,15 @@ async def check_single_model(entry: ModelEntry) -> Dict[str, Any]:
             out.update({'status': 'ok' if ok else 'warning', 'latency_ms': dt})
         elif entry.kind == 'embedding':
             url = f"{(base_url or '').rstrip('/')}/embeddings"
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type":"application/json"}
+            headers = {"Content-Type":"application/json"}
+            if api_key and not (base_url and (('11434' in base_url) or ('ollama' in base_url.lower()))):
+                headers["Authorization"] = f"Bearer {api_key}"
             r = requests.post(url, json={'model': entry.model, 'input': 'ping'}, headers=headers, timeout=30)
             ok = r.status_code == 200 and isinstance(r.json().get('data'), list)
             dim = len((r.json().get('data') or [{}])[0].get('embedding') or []) if ok else 0
             out.update({'status': 'ok' if ok else 'warning', 'http_status': r.status_code, 'dimension': dim})
         elif entry.kind == 'reranker':
+            # 确保以 /v1/rerank 访问
             url = f"{(base_url or '').rstrip('/')}/rerank"
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type":"application/json"}
             r = requests.post(url, json={'model': entry.model, 'query': 'headache', 'documents': ['doc1','doc2'], 'top_n': 2}, headers=headers, timeout=30)
@@ -474,3 +875,110 @@ async def check_single_model(entry: ModelEntry) -> Dict[str, Any]:
     except Exception as e:
         out.update({'status': 'error', 'error': str(e)})
     return out
+
+
+@router.post('/models/registry/{kind}', summary='新增模型条目（单条）')
+async def add_model_entry(kind: str, entry: ModelEntry) -> Dict[str, Any]:
+    """向模型库新增单个条目。如果存在相同 id 或 provider-kind-model 组合，则覆盖该条目。"""
+    kind_map = {
+        'llm': 'llms', 'llms': 'llms',
+        'embedding': 'embeddings', 'embeddings': 'embeddings',
+        'reranker': 'rerankers', 'rerankers': 'rerankers',
+    }
+    lst_name = kind_map.get(kind.lower())
+    if not lst_name:
+        raise HTTPException(status_code=400, detail=f'无效kind: {kind}')
+
+    reg = _load_registry()
+    items = getattr(reg, lst_name)
+
+    # 规范化 kind
+    entry.kind = 'llm' if lst_name == 'llms' else ('embedding' if lst_name == 'embeddings' else 'reranker')
+
+    # 生成缺省 id/label
+    def ensure_id_label(it: ModelEntry):
+        if (not it.id) or (not str(it.id).strip()):
+            base = f"{it.provider}-{it.kind}-{it.model}".replace('/', '_').replace(':', '_')
+            it.id = base
+        if (not it.label) or (not str(it.label).strip()):
+            it.label = it.model
+
+    ensure_id_label(entry)
+
+    # 去重：按 id 或 provider-kind-model 覆盖
+    def key(it: ModelEntry) -> str:
+        return f"{it.provider}-{it.kind}-{it.model}"
+    new_list: list[ModelEntry] = []
+    replaced = False
+    for it in items:
+        if it.id == entry.id or key(it) == key(entry):
+            if not replaced:
+                new_list.append(entry)
+                replaced = True
+            else:
+                # 已替换一次，跳过重复
+                continue
+        else:
+            new_list.append(it)
+    if not replaced:
+        new_list.append(entry)
+
+    setattr(reg, lst_name, new_list)
+    _save_registry(reg)
+
+    # 返回去掉明文密钥的条目
+    d = entry.model_dump()
+    if 'api_key' in d:
+        d['has_api_key'] = bool(d.get('api_key'))
+        d.pop('api_key', None)
+    return {'ok': True, 'item': d}
+
+
+@router.patch('/models/registry/{kind}/{entry_id}', summary='更新单个模型条目（局部更新）')
+async def patch_model_entry(kind: str, entry_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """按ID更新模型条目，支持 label/model/base_url/api_key_env/api_key 字段。"""
+    kind_map = {
+        'llm': 'llms', 'llms': 'llms',
+        'embedding': 'embeddings', 'embeddings': 'embeddings',
+        'reranker': 'rerankers', 'rerankers': 'rerankers',
+    }
+    lst_name = kind_map.get(kind.lower())
+    if not lst_name:
+        raise HTTPException(status_code=400, detail=f'无效kind: {kind}')
+    reg = _load_registry()
+    items = getattr(reg, lst_name)
+    idx = next((i for i, it in enumerate(items) if (it.id == entry_id)), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail=f'未找到模型: {entry_id}')
+    # 允许更新的字段
+    allowed = {'label', 'model', 'base_url', 'api_key_env', 'api_key'}
+    for k, v in payload.items():
+        if k in allowed:
+            setattr(items[idx], k, v)
+    _save_registry(reg)
+    # 返回去掉密钥的条目
+    d = items[idx].model_dump()
+    if 'api_key' in d:
+        d['has_api_key'] = bool(d.get('api_key'))
+        d.pop('api_key', None)
+    return {'ok': True, 'item': d}
+
+
+@router.delete('/models/registry/{kind}/{entry_id}', summary='删除单个模型条目')
+async def delete_model_entry(kind: str, entry_id: str) -> Dict[str, Any]:
+    kind_map = {
+        'llm': 'llms', 'llms': 'llms',
+        'embedding': 'embeddings', 'embeddings': 'embeddings',
+        'reranker': 'rerankers', 'rerankers': 'rerankers',
+    }
+    lst_name = kind_map.get(kind.lower())
+    if not lst_name:
+        raise HTTPException(status_code=400, detail=f'无效kind: {kind}')
+    reg = _load_registry()
+    items = getattr(reg, lst_name)
+    new_items = [it for it in items if it.id != entry_id]
+    if len(new_items) == len(items):
+        raise HTTPException(status_code=404, detail=f'未找到模型: {entry_id}')
+    setattr(reg, lst_name, new_items)
+    _save_registry(reg)
+    return {'ok': True, 'deleted': entry_id}

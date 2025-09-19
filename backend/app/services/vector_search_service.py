@@ -12,52 +12,50 @@ from sqlalchemy import text
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 加载环境变量（统一 backend/.env）
+# 加载环境变量（统一 backend/.env），在容器可通过 SKIP_LOCAL_DOTENV/DOCKER_CONTEXT 禁用
 try:
-    env_path = Path(__file__).resolve().parents[2] / ".env"
-    if env_path.exists():
-        load_dotenv(str(env_path))
-    else:
-        load_dotenv()
+    if os.getenv('SKIP_LOCAL_DOTENV', '').lower() != 'true' and os.getenv('DOCKER_CONTEXT', '').lower() != 'true':
+        env_path = Path(__file__).resolve().parents[2] / ".env"
+        if env_path.exists():
+            load_dotenv(str(env_path))
+        else:
+            load_dotenv()
 except Exception:
-    load_dotenv()
+    pass
 
 logger = logging.getLogger(__name__)
 
 class SiliconFlowEmbedder:
-    """SiliconFlow API嵌入生成器"""
-    
-    def __init__(self, api_key: str = None, model: str = "BAAI/bge-m3"):
+    """OpenAI-compatible embeddings client (SiliconFlow / Ollama).
+    - Base URL from env: OLLAMA_BASE_URL or SILICONFLOW_BASE_URL (default SF)
+    - If base URL contains '11434' or 'ollama', no API key is required.
+    """
+
+    def __init__(self, api_key: str = None, model: str = None):
+        self.model = model or os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
+        self.endpoint = (
+            os.getenv('OLLAMA_BASE_URL')
+            or os.getenv('SILICONFLOW_BASE_URL')
+            or 'https://api.siliconflow.cn/v1'
+        ).rstrip('/')
         self.api_key = api_key or os.getenv('SILICONFLOW_API_KEY')
-        self.model = model
-        self.base_url = "https://api.siliconflow.cn/v1/embeddings"
-        
+
     def generate_embedding(self, text: str) -> List[float]:
-        """生成单个文本的嵌入向量"""
-        if not self.api_key:
-            logger.warning("未设置SiliconFlow API密钥，使用随机向量")
-            return np.random.normal(0, 0.1, 1024).tolist()
-            
         try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model,
-                "input": text,
-                "encoding_format": "float"
-            }
-            
-            response = requests.post(self.base_url, headers=headers, json=data, timeout=30)
-            response.raise_for_status()
-            
-            result = response.json()
-            return result['data'][0]['embedding']
-            
+            prefers_ollama = ('11434' in self.endpoint) or ('ollama' in self.endpoint.lower())
+            headers = {"Content-Type": "application/json"}
+            if not prefers_ollama and self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            payload = {"model": self.model, "input": text}
+            resp = requests.post(f"{self.endpoint}/embeddings", headers=headers, json=payload, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            emb = (data.get('data') or [{}])[0].get('embedding')
+            if not isinstance(emb, list):
+                raise ValueError('invalid embeddings response')
+            return emb
         except Exception as e:
-            logger.error(f"SiliconFlow API调用失败: {e}")
+            logger.error(f"Embeddings failed ({self.endpoint}): {e}; using random vector")
             return np.random.normal(0, 0.1, 1024).tolist()
 
 class VectorSearchService:
@@ -66,6 +64,10 @@ class VectorSearchService:
     def __init__(self, db: Session):
         self.db = db
         self.embedder = SiliconFlowEmbedder()
+        try:
+            self.pgvector_probes = int(os.getenv('PGVECTOR_PROBES', '20'))
+        except Exception:
+            self.pgvector_probes = 20
     
     def search_panels(
         self, 
@@ -78,6 +80,12 @@ class VectorSearchService:
             query_vector = self.embedder.generate_embedding(query_text)
             vector_str = '[' + ','.join(map(str, query_vector)) + ']'
             
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    self.db.execute(text(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)}"))
+            except Exception:
+                pass
+
             query = text(f"""
                 SELECT 
                     id,
@@ -122,6 +130,12 @@ class VectorSearchService:
             query_vector = self.embedder.generate_embedding(query_text)
             vector_str = '[' + ','.join(map(str, query_vector)) + ']'
             
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    self.db.execute(text(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)}"))
+            except Exception:
+                pass
+
             query = text(f"""
                 SELECT 
                     t.id,
@@ -169,6 +183,12 @@ class VectorSearchService:
             query_vector = self.embedder.generate_embedding(query_text)
             vector_str = '[' + ','.join(map(str, query_vector)) + ']'
             
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    self.db.execute(text(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)}"))
+            except Exception:
+                pass
+
             query = text(f"""
                 SELECT 
                     s.id,
@@ -229,6 +249,12 @@ class VectorSearchService:
             query_vector = self.embedder.generate_embedding(query_text)
             vector_str = '[' + ','.join(map(str, query_vector)) + ']'
             
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    self.db.execute(text(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)}"))
+            except Exception:
+                pass
+
             query = text(f"""
                 SELECT 
                     p.id,
@@ -285,6 +311,12 @@ class VectorSearchService:
             query_vector = self.embedder.generate_embedding(query_text)
             vector_str = '[' + ','.join(map(str, query_vector)) + ']'
             
+            try:
+                if self.pgvector_probes and self.pgvector_probes > 0:
+                    self.db.execute(text(f"SET LOCAL ivfflat.probes = {int(self.pgvector_probes)}"))
+            except Exception:
+                pass
+
             query = text(f"""
                 SELECT 
                     cr.id,

@@ -14,10 +14,17 @@ const DataBrowser: React.FC = () => {
   const [scenario, setScenario] = useState<string>('')
   const [q, setQ] = useState('')
 
+  const normList = (data: any, preferKey?: string) => {
+    if (Array.isArray(data)) return data
+    if (preferKey && Array.isArray(data?.[preferKey])) return data[preferKey]
+    if (Array.isArray(data?.items)) return data.items
+    return []
+  }
+
   const loadPanels = async () => {
     try {
       const r = await api.get('/api/v1/acrac/data/panels')
-      setPanels(r.data)
+      setPanels(normList(r.data))
     } catch (e:any) {
       message.error('加载科室失败: '+(e?.response?.data?.detail || e.message))
     }
@@ -25,7 +32,7 @@ const DataBrowser: React.FC = () => {
   const loadTopics = async (pid: string) => {
     try {
       const r = await api.get('/api/v1/acrac/data/topics/by-panel', { params: { panel_id: pid }})
-      setTopics(r.data)
+      setTopics(normList(r.data))
     } catch (e:any) {
       message.error('加载主题失败: '+(e?.response?.data?.detail || e.message))
     }
@@ -33,7 +40,7 @@ const DataBrowser: React.FC = () => {
   const loadScenarios = async (tid: string) => {
     try {
       const r = await api.get('/api/v1/acrac/data/scenarios/by-topic', { params: { topic_id: tid }})
-      setScenarios(r.data)
+      setScenarios(normList(r.data))
     } catch (e:any) {
       message.error('加载场景失败: '+(e?.response?.data?.detail || e.message))
     }
@@ -58,11 +65,14 @@ const DataBrowser: React.FC = () => {
             <Select
               value={panel||undefined}
               onChange={(v)=>{ setPanel(v); setTopic(''); setScenario(''); setScenarios([]); setRecs([]); loadTopics(v) }}
-              options={panels.map(p=> ({ value: p.semantic_id, label: `${p.semantic_id} ${p.name_zh} (${p.topics_count})` }))}
+              options={panels.map(p=> ({ value: p.semantic_id, label: `${p.semantic_id} ${p.name_zh||''} (${p.topics_count||0})` }))}
               style={{ width: '100%' }}
               placeholder='选择科室'
             />
             <Paragraph type='secondary' style={{ marginTop: 8 }}>共 {panels.length} 个科室</Paragraph>
+            {panels.length === 0 && (
+              <Paragraph type='secondary'>未加载到数据。请先在“数据导入”页面完成导入。</Paragraph>
+            )}
           </Card>
         </Col>
         <Col span={6}>
@@ -70,7 +80,7 @@ const DataBrowser: React.FC = () => {
             <Select
               value={topic||undefined}
               onChange={(v)=>{ setTopic(v); setScenario(''); setRecs([]); loadScenarios(v) }}
-              options={topics.map(t=> ({ value: t.semantic_id, label: `${t.semantic_id} ${t.name_zh} (${t.scenarios_count})` }))}
+              options={topics.map(t=> ({ value: t.semantic_id, label: `${t.semantic_id} ${t.name_zh||''} (${t.scenarios_count||0})` }))}
               style={{ width: '100%' }}
               placeholder='选择主题'
               disabled={!panel}

@@ -82,28 +82,26 @@ def norm(s: str) -> str:
 
 
 class SiliconFlowEmbedder:
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, endpoint: str = "https://api.siliconflow.cn/v1", allow_random: bool = False):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, endpoint: Optional[str] = None, allow_random: bool = False):
+        # Prefer Ollama base if provided; otherwise SiliconFlow
+        base = endpoint or os.getenv("OLLAMA_BASE_URL") or os.getenv("SILICONFLOW_BASE_URL") or "https://api.siliconflow.cn/v1"
+        self.endpoint = base.rstrip("/")
         self.api_key = api_key or os.getenv("SILICONFLOW_API_KEY")
         self.model = model or os.getenv("SILICONFLOW_EMBEDDING_MODEL", "BAAI/bge-m3")
-        self.endpoint = endpoint.rstrip("/")
         self.allow_random = allow_random
-        if not self.api_key and not self.allow_random:
-            raise RuntimeError("SILICONFLOW_API_KEY not set. Refusing to build embeddings without a key. Set ALLOW_RANDOM_EMBEDDINGS=true to override (not recommended).")
-        if not self.api_key and self.allow_random:
+        prefers_ollama = ("11434" in self.endpoint) or ("ollama" in self.endpoint.lower())
+        if (not prefers_ollama) and (not self.api_key) and (not self.allow_random):
+            raise RuntimeError("SILICONFLOW_API_KEY not set. Set OLLAMA_BASE_URL to use local /v1/embeddings, or set ALLOW_RANDOM_EMBEDDINGS=true (not recommended).")
+        if (not prefers_ollama) and (not self.api_key) and self.allow_random:
             logger.warning("SILICONFLOW_API_KEY not set. Embeddings will fallback to random vectors (ALLOW_RANDOM_EMBEDDINGS=true)")
 
     def embed_texts(self, texts: List[str], batch_size: int = 32, timeout: int = 60) -> List[List[float]]:
         if not texts:
             return []
-        if not self.api_key:
-            # Fallback: random embeddings for offline use
-            logger.warning("Using random vectors (no API key). For production, set SILICONFLOW_API_KEY.")
-            return [np.random.rand(1024).tolist() for _ in texts]
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        prefers_ollama = ("11434" in self.endpoint) or ("ollama" in self.endpoint.lower())
+        headers = {"Content-Type": "application/json"}
+        if (not prefers_ollama) and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         results: List[List[float]] = []
         url = f"{self.endpoint}/embeddings"
 
@@ -121,16 +119,14 @@ class SiliconFlowEmbedder:
                 for item in data["data"]:
                     results.append(item["embedding"])  # type: ignore[index]
             except Exception as e:
-                logger.error(f"Embedding request failed, fallback to random for current batch: {e}")
-                # Fallback preserves downstream flow; dimension guessed from first success or 1024
-                dim = len(results[0]) if results else 1024
-                results.extend([np.random.rand(dim).tolist() for _ in chunk])
+                logger.error(f"Embedding request failed: {e}")
+                raise
 
         return results
 
 
 class ACRACBuilder:
-    def __init__(self, db_config: Optional[Dict[str, str]] = None, api_key: Optional[str] = None, model: Optional[str] = None, allow_random: bool = False):
+    def __init__(self, db_config: Optional[Dict[str, str]] = None, api_key: Optional[str] = None, model: Optional[str] = None, allow_random: bool = False, embedding_dim: Optional[int] = None):
         self.db_config = db_config or {
             "host": os.getenv("PGHOST", "localhost"),
             "port": os.getenv("PGPORT", "5432"),
@@ -142,7 +138,11 @@ class ACRACBuilder:
         self.cursor = None
 
         self.embedder = SiliconFlowEmbedder(api_key=api_key, model=model, allow_random=allow_random)
-        self.embedding_dim: Optional[int] = None  # determined on first embed
+        # determined on first embed or provided via args/env
+        try:
+            self.embedding_dim: Optional[int] = int(embedding_dim) if embedding_dim is not None else (int(os.getenv("EMBEDDING_DIM")) if os.getenv("EMBEDDING_DIM") else None)
+        except Exception:
+            self.embedding_dim = embedding_dim
 
         self.stats = {
             "panels_created": 0,
@@ -199,8 +199,8 @@ class ACRACBuilder:
             self.cursor.execute("DROP TABLE IF EXISTS topics CASCADE;")
             self.cursor.execute("DROP TABLE IF EXISTS panels CASCADE;")
 
-            # Defer embedding dim until first embed; temporary use 1024 then alter if needed
-            dim = 1024
+            # Embedding dimension: use provided/detected value; fallback to 1024
+            dim = self.embedding_dim or 1024
 
             self.cursor.execute(
                 f"""
@@ -427,12 +427,35 @@ class ACRACBuilder:
     def load_csv(self, csv_path: str) -> pd.DataFrame:
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"CSV not found: {csv_path}")
-        last_err = None
-        for enc in ["utf-16", "utf-8", "gbk", "gb2312"]:
+
+        # 粗略检测文件BOM, 优先尝试匹配编码
+        enc_candidates: List[str] = []
+        try:
+            with open(csv_path, 'rb') as fh:
+                head = fh.read(4)
+            if head.startswith(b"\xff\xfe"):
+                enc_candidates.extend(["utf-16", "utf-16-le"])
+            elif head.startswith(b"\xfe\xff"):
+                enc_candidates.extend(["utf-16", "utf-16-be"])
+            elif head.startswith(b"\xef\xbb\xbf"):
+                enc_candidates.append("utf-8-sig")
+        except Exception:
+            pass
+
+        # 默认候选编码列表（附带BOM优先项）
+        enc_candidates += ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "utf-8", "gbk", "gb2312"]
+
+        tried = set()
+        last_err: Optional[Exception] = None
+        for enc in enc_candidates:
+            key = enc.lower()
+            if key in tried:
+                continue
+            tried.add(key)
             for sep in ["\t", ",", ";"]:
                 try:
-                    df = pd.read_csv(csv_path, encoding=enc, sep=sep)
-                    if len(df.columns) >= 12:
+                    df = pd.read_csv(csv_path, encoding=enc, sep=sep, engine='python')
+                    if len(df.columns) >= 8:  # 至少应有基础列
                         logger.info(f"CSV read success with encoding={enc} sep='{sep}' rows={len(df)} cols={len(df.columns)}")
                         return df.fillna("")
                 except Exception as e:
@@ -441,26 +464,82 @@ class ACRACBuilder:
         raise ValueError(f"Failed to read CSV, last error: {last_err}")
 
     def preprocess(self, df: pd.DataFrame):
-        # 必需列
-        required = [
-            'Panel', 'Panel Translation', 'Topic', 'Topic Translation',
-            'Variant', 'Variant Translation', 'Procedure', 'Standardized',
-        ]
-        for c in required:
-            if c not in df.columns:
-                raise ValueError(f"Missing required column: {c}")
-
-        # 可选字段自动探测（大小写/中英文宽松匹配）
+        # 列名辅助匹配
         def find_col(candidates: List[str]) -> Optional[str]:
             cols_lower = {c.lower(): c for c in df.columns}
             for cand in candidates:
                 if cand.lower() in cols_lower:
                     return cols_lower[cand.lower()]
-            # 子串匹配（谨慎）
             for k, orig in cols_lower.items():
                 if any(cand.lower() in k for cand in candidates):
                     return orig
             return None
+
+        # 统一列名映射（兼容中英文列头）
+        column_aliases = {
+            'Panel': ['Panel', '学科', '科室'],
+            'Panel Translation': ['Panel Translation', '学科翻译', '科室翻译', '科室英文', '学科(英)'],
+            'Topic': ['Topic', '主题'],
+            'Topic Translation': ['Topic Translation', '主题翻译', '主题英文'],
+            'Variant': ['Variant', '临床场景', '场景'],
+            'Variant Translation': ['Variant Translation', '临床场景翻译', '场景英文'],
+            'Procedure': ['Procedure', '标准检查名称', '检查项目', '推荐检查'],
+            'Standardized': ['Standardized', '标准化名称', '标准检查名称', '标准化推荐'],
+            'Appropriateness Category': ['Appropriateness Category', '适应性', '类别'],
+            'Appropriateness Category Translation': ['Appropriateness Category Translation', '适应性翻译', '适应性英文'],
+            'Rating': ['Rating', '评分'],
+            'Median': ['Median', '中位数'],
+            'Recommendation': ['Recommendation', '推荐理由', '推荐意见'],
+            'Recommendation Translation': ['Recommendation Translation', '推荐理由翻译', '推荐意见英文'],
+            'SOE': ['SOE', '证据强度', '证据'],
+            'Adult RRL': ['Adult RRL', 'Adult Radiation Dose', '成人辐射', '成人RRL'],
+            'Peds RRL': ['Peds RRL', '儿童辐射', 'Pediatric RRL'],
+        }
+
+        rename_map: Dict[str, str] = {}
+        for canon, candidates in column_aliases.items():
+            col = find_col(candidates)
+            if col:
+                rename_map[col] = canon
+
+        if rename_map:
+            df = df.rename(columns=rename_map)
+
+        # 必需列兜底处理
+        if 'Panel' not in df.columns:
+            raise ValueError("Missing required column: Panel (e.g. 学科/科室)")
+        if 'Panel Translation' not in df.columns:
+            df['Panel Translation'] = df['Panel']
+        if 'Topic' not in df.columns:
+            raise ValueError("Missing required column: Topic (e.g. 主题)")
+        if 'Topic Translation' not in df.columns:
+            df['Topic Translation'] = df['Topic']
+        if 'Variant' not in df.columns:
+            raise ValueError("Missing required column: Variant (e.g. 临床场景)")
+        if 'Variant Translation' not in df.columns:
+            df['Variant Translation'] = df['Variant']
+        if 'Procedure' not in df.columns:
+            raise ValueError("Missing required column: Procedure (e.g. 标准检查名称)")
+        if 'Standardized' not in df.columns:
+            df['Standardized'] = df['Procedure']
+        if 'Appropriateness Category' not in df.columns:
+            df['Appropriateness Category'] = ''
+        if 'Appropriateness Category Translation' not in df.columns:
+            df['Appropriateness Category Translation'] = df['Appropriateness Category']
+        if 'Rating' not in df.columns:
+            df['Rating'] = ''
+        if 'Median' not in df.columns:
+            df['Median'] = ''
+        if 'Recommendation' not in df.columns:
+            df['Recommendation'] = df['Recommendation Translation'] if 'Recommendation Translation' in df.columns else ''
+        if 'Recommendation Translation' not in df.columns:
+            df['Recommendation Translation'] = df['Recommendation']
+        if 'SOE' not in df.columns:
+            df['SOE'] = ''
+        if 'Adult RRL' not in df.columns:
+            df['Adult RRL'] = ''
+        if 'Peds RRL' not in df.columns:
+            df['Peds RRL'] = ''
 
         # 仅辐射等级严格使用CSV；其余字段按规则提取（允许多值）
         radiation_level_col = find_col(["Radiation Level", "RRL Level", "辐射等级", "Adult RRL Level", "Adult Radiation Level"])  # 原样入库（若存在）
@@ -785,6 +864,11 @@ class ACRACBuilder:
             self.embedding_dim = len(embs[0])
         # 批量更新向量
         for i, (emb, pk) in enumerate(zip(embs, idx_map)):
+            if self.embedding_dim and len(emb) != int(self.embedding_dim):
+                raise ValueError(
+                    f"Embedding dimension mismatch: expected {self.embedding_dim}, got {len(emb)}."
+                    " 请确认 Embedding Base URL / 模型设置正确 (例如 Ollama 使用 http://host.docker.internal:11434/v1)"
+                )
             self.cursor.execute(f"UPDATE {table} SET embedding = %s WHERE id = %s;", (emb, pk))
             if i % 100 == 0:  # 每100条提交一次
                 self.conn.commit()
@@ -1001,6 +1085,7 @@ def main():
     parser.add_argument("--model", default="BAAI/bge-m3", help="SiliconFlow embedding model id")
     parser.add_argument("--skip-schema", action="store_true", help="Skip schema creation (for incremental runs)")
     parser.add_argument("--allow-random", action="store_true", help="Allow random embeddings if API key missing (not recommended)")
+    parser.add_argument("--embedding-dim", type=int, default=None, help="Embedding vector dimension; if omitted, uses EMBEDDING_DIM env or detects from model")
     args = parser.parse_args()
 
     # If passed explicitly, set env as well
@@ -1008,13 +1093,28 @@ def main():
         os.environ.setdefault("SILICONFLOW_API_KEY", args.api_key)
     os.environ.setdefault("SILICONFLOW_EMBEDDING_MODEL", args.model)
 
-    builder = ACRACBuilder(api_key=args.api_key or os.getenv("SILICONFLOW_API_KEY"), model=args.model, allow_random=args.allow_random or os.getenv("ALLOW_RANDOM_EMBEDDINGS","false").lower()=="true")
+    builder = ACRACBuilder(
+        api_key=args.api_key or os.getenv("SILICONFLOW_API_KEY"),
+        model=args.model,
+        allow_random=args.allow_random or os.getenv("ALLOW_RANDOM_EMBEDDINGS","false").lower()=="true",
+        embedding_dim=args.embedding_dim
+    )
     if not builder.connect():
         return 1
     try:
         if args.action in ["build", "rebuild"]:
             if not args.skip_schema:
-                logger.info("Creating schema...")
+                # Detect embedding dimension if not specified
+                if builder.embedding_dim is None:
+                    try:
+                        probe = builder.embedder.embed_texts(["dimension_probe"]) or []
+                        if probe and isinstance(probe[0], list):
+                            builder.embedding_dim = len(probe[0])
+                            os.environ.setdefault("EMBEDDING_DIM", str(builder.embedding_dim))
+                            logger.info(f"Detected embedding dimension: {builder.embedding_dim}")
+                    except Exception as de:
+                        logger.warning(f"Embedding dimension detection failed, fallback to 1024: {de}")
+                logger.info(f"Creating schema (dim={builder.embedding_dim or 1024})...")
                 if not builder.create_schema():
                     return 1
             logger.info("Loading CSV...")

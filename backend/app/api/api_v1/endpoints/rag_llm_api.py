@@ -40,6 +40,8 @@ class IntelligentRecommendationResponse(BaseModel):
     scenarios_with_recommendations: Optional[list] = None
     processing_time_ms: Optional[int] = None
     model_used: Optional[str] = None
+    embedding_model_used: Optional[str] = None
+    reranker_model_used: Optional[str] = None
     similarity_threshold: Optional[float] = None
     max_similarity: Optional[float] = None
     is_low_similarity_mode: Optional[bool] = None
@@ -101,6 +103,8 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
             "llm_recommendations": result.get("llm_recommendations"),
             "processing_time_ms": result.get("processing_time_ms"),
             "model_used": result.get("model_used"),
+            "embedding_model_used": result.get("embedding_model_used"),
+            "reranker_model_used": result.get("reranker_model_used"),
             "similarity_threshold": result.get("similarity_threshold"),
             "max_similarity": result.get("max_similarity"),
             "is_low_similarity_mode": result.get("is_low_similarity_mode")

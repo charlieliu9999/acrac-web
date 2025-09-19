@@ -1,5 +1,5 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 import os
 from pathlib import Path
@@ -84,11 +84,15 @@ class Settings(BaseSettings):
     RULES_ENABLED: bool = False
     RULES_AUDIT_ONLY: bool = True
     RULES_CONFIG_PATH: str = str(Path(__file__).resolve().parents[2] / "config" / "rules_packs.json")
-    
-    class Config:
-        # 统一从 backend/.env 加载
-        env_file = str(Path(__file__).resolve().parents[2] / ".env")
-        case_sensitive = True
+    # Pydantic v2 settings configuration
+    # - Load env from backend/.env
+    # - Be case sensitive
+    # - Ignore unknown/extra env vars to avoid validation errors
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parents[2] / ".env"),
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 # Create settings instance
 settings = Settings()
