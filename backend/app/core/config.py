@@ -4,6 +4,12 @@ from typing import List, Optional
 import os
 from pathlib import Path
 
+# Determine whether to load local .env (skip in Docker)
+_skip_local = os.getenv("SKIP_LOCAL_DOTENV", "").lower() in ("1", "true", "yes") or \
+               os.getenv("DOCKER_CONTEXT", "").lower() in ("1", "true", "yes")
+_env_file_path = str(Path(__file__).resolve().parents[2] / ".env") if not _skip_local else None
+
+
 class Settings(BaseSettings):
     # Project info
     PROJECT_NAME: str = "ACRAC System"
@@ -85,11 +91,11 @@ class Settings(BaseSettings):
     RULES_AUDIT_ONLY: bool = True
     RULES_CONFIG_PATH: str = str(Path(__file__).resolve().parents[2] / "config" / "rules_packs.json")
     # Pydantic v2 settings configuration
-    # - Load env from backend/.env
-    # - Be case sensitive
-    # - Ignore unknown/extra env vars to avoid validation errors
+    # - In Docker, skip loading backend/.env to avoid localhost DSNs
+    # - Otherwise, load backend/.env for local dev
+    # - Be case sensitive; ignore extra env keys
     model_config = SettingsConfigDict(
-        env_file=str(Path(__file__).resolve().parents[2] / ".env"),
+        env_file=_env_file_path,
         case_sensitive=True,
         extra="ignore",
     )

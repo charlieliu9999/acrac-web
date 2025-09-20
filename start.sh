@@ -52,6 +52,18 @@ select_dc() {
     fi
 }
 
+# 端口占用检测（尽量友好，若被占用则退出并提示使用合适脚本）
+port_in_use() {
+    local port=$1
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -i TCP:${port} -sTCP:LISTEN >/dev/null 2>&1
+        return $?
+    else
+        # 尝试 bash tcp 探测
+        (echo >/dev/tcp/127.0.0.1/${port}) >/dev/null 2>&1 && return 0 || return 1
+    fi
+}
+
 # 检查必要的命令与文件
 check_dependencies() {
     log_info "检查依赖..."
@@ -71,6 +83,20 @@ check_dependencies() {
 # 启动所有服务
 start_services() {
     log_info "正在使用 Docker-Compose 启动所有服务..."
+
+    # 防冲突：常见端口 8001 / 5173 / 8080 如被本地进程占用，提示使用 start-dev.sh 或释放端口
+    if port_in_use 8001; then
+        log_error "检测到本机 8001 端口被占用。若正在本地运行后端 dev，请使用 ./start-dev.sh，或释放端口后再运行 ./start.sh。"
+        exit 1
+    fi
+    if port_in_use 5173; then
+        log_error "检测到本机 5173 端口被占用。若正在本地运行前端 dev，请使用 ./start-dev.sh，或释放端口后再运行 ./start.sh。"
+        exit 1
+    fi
+    if port_in_use 8080; then
+        log_error "检测到本机 8080 端口被占用（Nginx 将无法绑定）。请释放端口后再运行 ./start.sh，或关闭冲突进程。"
+        exit 1
+    fi
 
     # 停止并移除旧容器，以防冲突
     $DC down
@@ -114,8 +140,8 @@ show_status() {
     echo "=== 服务状态 ==="
     echo -e "${GREEN}✓ 所有服务已在 Docker 容器中运行${NC}"
     echo -e "  - ${GREEN}后端API:${NC} http://localhost:8001"
-    echo -e "  - ${GREEN}前端应用:${NC} http://localhost:5173 (如果已在docker-compose.yml中配置)"
-    echo -e "  - ${GREEN}API文档:${NC} http://localhost:8001/docs"
+    echo -e "  - ${GREEN}前端应用:${NC} http://localhost:8080 (Nginx) 或 http://localhost:5173"
+    echo -e "  - ${GREEN}API文档:${NC} http://localhost:8080/docs （或直连 http://localhost:8001/docs）"
     echo
     echo "=== 查看日志 ==="
     echo "运行 '$DC logs -f' 查看所有服务的实时日志"
@@ -147,6 +173,15 @@ main() {
     fi
 
     start_services
+    # 基础可达性校验：检测 Nginx 与后端健康接口
+    if command -v curl >/dev/null 2>&1; then
+        if ! curl -sSf http://localhost:8080 >/dev/null 2>&1; then
+            log_error "Nginx(8080) 无法访问。可能原因：端口被占用、Nginx配置错误或前端未就绪。建议执行: 'docker-compose logs nginx frontend' 排查。"
+        fi
+        if ! curl -sSf http://localhost:8001/api/v1/acrac/health >/dev/null 2>&1; then
+            log_error "后端健康检查失败。请执行: 'docker-compose logs backend' 排查。"
+        fi
+    fi
     show_status
 
     log_success "ACRAC项目启动完成！"
@@ -154,6 +189,18 @@ main() {
 
 # 错误处理
 trap 'log_error "启动过程中发生错误，请检查日志"; exit 1' ERR
+
+# 端口占用检测（尽量友好，若被占用则退出并提示使用合适脚本）
+port_in_use() {
+    local port=$1
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -i TCP:${port} -sTCP:LISTEN >/dev/null 2>&1
+        return $?
+    else
+        # 尝试 nc 探测
+        (echo >/dev/tcp/127.0.0.1/${port}) >/dev/null 2>&1 && return 0 || return 1
+    fi
+}
 
 # 运行主函数
 main "$@"

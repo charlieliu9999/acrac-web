@@ -17,6 +17,9 @@ UPLOAD_DIR = BACKEND_DIR / 'uploads'
 SCRIPTS_DIR = BACKEND_DIR / 'scripts'
 REGISTRY_PATH = BACKEND_DIR / 'config' / 'models_registry.json'
 CONTEXTS_PATH = BACKEND_DIR / 'config' / 'model_contexts.json'
+# 内存缓存，避免临时解析失败导致前端看到空白
+_REGISTRY_CACHE = None  # type: Optional["ModelsRegistry"]
+_CONTEXTS_CACHE = None  # type: Optional[Dict[str, Any]]
 
 
 class ImportRequest(BaseModel):
@@ -554,34 +557,51 @@ def _update_env(text: str, key: str, value: Optional[str]) -> str:
 
 
 def _load_registry() -> ModelsRegistry:
+    """加载模型库；如文件缺失或解析失败，回退到内存缓存。"""
+    global _REGISTRY_CACHE
     if not REGISTRY_PATH.exists():
-        return ModelsRegistry()
+        return _REGISTRY_CACHE or ModelsRegistry()
     try:
         import json
         data = json.loads(REGISTRY_PATH.read_text(encoding='utf-8'))
-        return ModelsRegistry(**data)
+        reg = ModelsRegistry(**data)
+        _REGISTRY_CACHE = reg
+        return reg
     except Exception:
-        return ModelsRegistry()
+        return _REGISTRY_CACHE or ModelsRegistry()
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_text(text, encoding='utf-8')
+    tmp.replace(path)
 
 
 def _save_registry(reg: ModelsRegistry):
     import json
-    REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REGISTRY_PATH.write_text(json.dumps(reg.model_dump(), ensure_ascii=False, indent=2), encoding='utf-8')
+    global _REGISTRY_CACHE
+    _atomic_write(REGISTRY_PATH, json.dumps(reg.model_dump(), ensure_ascii=False, indent=2))
+    _REGISTRY_CACHE = reg
 
 
 def _load_contexts_payload() -> Dict[str, Any]:
+    """加载上下文配置；解析失败时使用内存缓存。"""
+    global _CONTEXTS_CACHE
     if not CONTEXTS_PATH.exists():
         return {'contexts': {}, 'scenario_overrides': []}
     try:
-        return json.loads(CONTEXTS_PATH.read_text(encoding='utf-8'))
+        data = json.loads(CONTEXTS_PATH.read_text(encoding='utf-8'))
+        _CONTEXTS_CACHE = data
+        return data
     except Exception:
-        return {'contexts': {}, 'scenario_overrides': []}
+        return _CONTEXTS_CACHE or {'contexts': {}, 'scenario_overrides': []}
 
 
 def _save_contexts_payload(payload: Dict[str, Any]) -> None:
-    CONTEXTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONTEXTS_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    global _CONTEXTS_CACHE
+    _CONTEXTS_CACHE = payload
+    _atomic_write(CONTEXTS_PATH, json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 @router.post('/models/config', summary='更新模型配置（写入.env并设置当前进程env）')
@@ -661,8 +681,10 @@ async def set_models_config(cfg: ModelsConfig) -> Dict[str, Any]:
         if cfg.rerank_provider is not None:
             os.environ['RERANK_PROVIDER'] = cfg.rerank_provider
 
+        # 在Docker环境中不写 .env（通过 env_file 注入），仅写入 JSON 并更新进程环境
+        skip_env_write = (os.getenv('DOCKER_CONTEXT','').lower() in ('1','true','yes')) or (os.getenv('SKIP_LOCAL_DOTENV','').lower() in ('1','true','yes'))
         env_path = BACKEND_DIR / '.env'
-        text = env_path.read_text(encoding='utf-8') if env_path.exists() else ''
+        text = env_path.read_text(encoding='utf-8') if (env_path.exists() and not skip_env_write) else ''
         env_updates: List[Tuple[str, Optional[str]]] = []
         if 'embedding_model' in inference_for_env:
             env_updates.append(('SILICONFLOW_EMBEDDING_MODEL', inference_for_env.get('embedding_model')))
@@ -686,15 +708,16 @@ async def set_models_config(cfg: ModelsConfig) -> Dict[str, Any]:
             env_updates.append(('OPENAI_API_KEY', cfg.openai_api_key))
         if cfg.rerank_provider is not None:
             env_updates.append(('RERANK_PROVIDER', cfg.rerank_provider))
-        for key, value in env_updates:
-            text = _update_env(text, key, value)
-        env_path.write_text(text, encoding='utf-8')
+        if not skip_env_write:
+            for key, value in env_updates:
+                text = _update_env(text, key, value)
+            env_path.write_text(text, encoding='utf-8')
 
         _save_contexts_payload({
             'contexts': updated_contexts,
             'scenario_overrides': overrides_payload,
         })
-        return {'ok': True, 'requires_restart': True}
+        return {'ok': True, 'requires_restart': True, 'env_file_updated': (not skip_env_write)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

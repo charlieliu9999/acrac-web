@@ -22,6 +22,14 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up ACRAC API...")
     # Create database tables (best-effort; don't crash if DB not available)
     try:
+        # Ensure pgvector extension exists before creating tables
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.commit()
+        except Exception as ee:
+            logger.warning(f"Skip CREATE EXTENSION vector: {ee}")
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created")
     except Exception as e:

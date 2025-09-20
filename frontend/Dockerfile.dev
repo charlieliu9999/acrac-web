@@ -12,6 +12,5 @@ COPY . .
 
 EXPOSE 5173
 
-# Run Vite dev server on 0.0.0.0 for container access
+# Run Vite dev server on 0.0.0.0 for container access (match nginx upstream)
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-

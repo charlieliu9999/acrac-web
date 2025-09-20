@@ -1,17 +1,13 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import acrac_simple, intelligent_analysis, three_methods_api, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_api
+from app.api.api_v1.endpoints import acrac_simple, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_api
 
 api_router = APIRouter()
 
 # Include the simplified ACRAC API
 api_router.include_router(acrac_simple.router, prefix="/acrac", tags=["acrac-v2"])
 
-# Include the intelligent analysis API
-api_router.include_router(intelligent_analysis.router, prefix="/acrac/intelligent", tags=["intelligent-analysis"])
-
-# Include the three methods API
-api_router.include_router(three_methods_api.router, prefix="/acrac/methods", tags=["three-methods"])
+# Deprecated/legacy endpoints (intelligent_analysis, three_methods) are not included to simplify API surface.
 
 # Include the new vector search API V2
 api_router.include_router(vector_search_api_v2.router, prefix="/acrac/vector/v2", tags=["vector-search-v2"])

@@ -42,7 +42,10 @@ ACRAC-web/
 - SiliconFlow / OpenAI API Key（如需运行完整 RAG + LLM 流程）
 
 ## 快速开始
-### 一键启动（Docker Compose）
+### 选择启动方式
+根据你的场景选择其一：
+
+1) 一键启动（Docker Compose，推荐部署/联调）
 ```bash
 ./start.sh
 ```
@@ -50,7 +53,21 @@ ACRAC-web/
 - 后端 API 与文档：http://localhost:8001/docs
 - 前端管理台：http://localhost:5173
 
-### 本地开发模式
+启动脚本会自动选择 docker compose 命令（v1/v2 兼容），并做以下校验：
+- 若本机 8001/5173 端口被本地 dev 进程占用，会提示改用 `./start-dev.sh` 或释放端口再运行。
+- 健康检查确保容器完全就绪后再返回。
+
+2) 本地开发模式（后端/前端热重载）
+```bash
+./start-dev.sh
+```
+脚本会仅拉起 Postgres 与 Redis 容器，并在宿主机本地启动后端（8001）与前端（5173）。
+为了避免与 Docker 栈冲突，若发现后端容器在运行，脚本会提示先 `./stop.sh` 或改用 `./start.sh`。
+
+> 提示：前端直连本地后端时，请在 `frontend/.env.development` 设置
+> `VITE_API_BASE=http://localhost:8001/api/v1`，否则请求会落到 Vite 自身端口。
+
+### 手动步骤（了解原理用）
 1. 克隆仓库：
    ```bash
    git clone <repository-url>
@@ -89,6 +106,13 @@ ACRAC-web/
    npm run dev  # Vite 默认 5173 端口
    ```
    自带 `start-dev.sh` 可一键拉起 Postgres、Redis、后端与前端热更新服务。
+
+### 端口与访问
+- Nginx（容器）：http://localhost:5173
+- 前端（容器）：由 Nginx 转发到 `frontend:5173`（Dockerfile.dev 已监听 5173）
+- 后端（容器）：http://localhost:8001
+- 数据库：`postgres:5432`（容器内服务名），宿主映射 `localhost:5432`
+- Redis：`redis:6379`（容器内服务名），宿主映射 `localhost:6379`
 
 ## API 速览
 - `GET /api/v1/acrac/vector/v2/search/comprehensive`：多实体综合检索

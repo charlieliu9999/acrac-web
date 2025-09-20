@@ -32,6 +32,17 @@ log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# 选择 docker compose 命令（v1/v2 兼容）
+select_dc() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        echo docker-compose
+    elif docker compose version >/dev/null 2>&1; then
+        echo "docker compose"
+    else
+        echo docker-compose
+    fi
+}
+
 # 检查必要的命令
 check_dependencies() {
     log_info "检查依赖..."
@@ -41,10 +52,8 @@ check_dependencies() {
         exit 1
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose未安装或未在PATH中"
-        exit 1
-    fi
+    DC="$(select_dc)"
+    log_info "使用Compose命令: $DC"
 
     # 尝试加载nvm
     if [ -f ~/.nvm/nvm.sh ]; then
@@ -106,7 +115,7 @@ start_database() {
     log_info "启动数据库服务..."
 
     # 只启动数据库相关容器
-    docker-compose up -d postgres redis
+    $DC up -d postgres redis
 
     # 等待数据库启动
     log_info "等待数据库启动..."
@@ -115,7 +124,7 @@ start_database() {
     # 检查数据库健康状态
     MAX_ATTEMPTS=10
     for ((ATTEMPT=1; ATTEMPT<=MAX_ATTEMPTS; ATTEMPT++)); do
-        if docker-compose exec -T postgres pg_isready -U postgres >/dev/null 2>&1; then
+        if $DC exec -T postgres pg_isready -U postgres >/dev/null 2>&1; then
             log_success "数据库启动成功"
             return
         fi
@@ -202,7 +211,7 @@ start_frontend() {
     fi
 
     # 启动前端开发服务器
-    log_info "启动前端开发服务器 (端口: 5173)..."
+    log_info "启动前端开发服务器 (端口: 5183)..."
     nohup npm run dev > ../logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo $FRONTEND_PID > ../logs/frontend.pid
@@ -216,7 +225,7 @@ start_frontend() {
     # 检查前端服务状态
     MAX_ATTEMPTS=10
     for ((ATTEMPT=1; ATTEMPT<=MAX_ATTEMPTS; ATTEMPT++)); do
-        if curl -s http://localhost:5173 >/dev/null 2>&1; then
+        if curl -s http://localhost:5183 >/dev/null 2>&1; then
             log_success "前端服务启动成功 (PID: $FRONTEND_PID)"
             return
         fi
@@ -258,6 +267,21 @@ show_status() {
 # 主函数
 main() {
     check_dependencies
+
+    # 防冲突校验：若已存在 Docker 后端栈在运行，阻止本地 dev 再起一套
+    if $DC ps backend 2>/dev/null | grep -q "Up"; then
+        log_error "检测到 Docker 后端容器在运行（backend）。请先执行 ./stop.sh，或使用 ./start.sh 运行容器模式。"
+        exit 1
+    fi
+
+    # 提示：前端本地开发建议设置 API Base
+    if [ ! -f "frontend/.env.development" ]; then
+        log_info "未检测到 frontend/.env.development。建议设置 VITE_API_BASE=http://localhost:8001/api/v1 以直连本地后端。"
+    else
+        if ! grep -q "VITE_API_BASE" frontend/.env.development; then
+            log_info "前端 dev 未设置 VITE_API_BASE，可能导致请求落到自身端口。建议在 frontend/.env.development 增加：VITE_API_BASE=http://localhost:8001/api/v1"
+        fi
+    fi
     create_log_dir
     stop_existing_processes
     start_database

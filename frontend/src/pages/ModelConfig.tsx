@@ -71,74 +71,52 @@ const ModelConfig: React.FC = () => {
   }, [registry, config, inferenceCtx, evaluationCtx, overrides])
 
   const load = async () => {
-    // 先加载模型库，确保下拉选项始终可用
+    try {
+      const r = await api.get('/api/v1/admin/data/models/config')
+      setConfig(r.data)
+      setContexts(r.data.contexts || { inference: {}, evaluation: {} })
+      setOverrides(r.data.scenario_overrides || [])
+      form.setFieldsValue({
+        embedding_model: r.data.embedding_model,
+        llm_model: r.data.llm_model,
+        reranker_model: r.data.reranker_model,
+        base_url: r.data.base_url,
+        rerank_provider: r.data.rerank_provider || 'auto',
+        ragas_llm_model: r.data.ragas_defaults?.llm_model || '',
+        ragas_embedding_model: r.data.ragas_defaults?.embedding_model || '',
+        siliconflow_api_key: '',
+        openai_api_key: '',
+      })
+    } catch (e: any) {
+      message.error('加载配置失败：' + (e?.response?.data?.detail || e.message))
+    } finally {
+      // 无论配置加载是否成功，都尝试加载模型库，避免表格空白
+      try {
+        setRegLoading(true)
+        const rr = await api.get('/api/v1/admin/data/models/registry')
+        setRegistry(rr.data || { llms: [], embeddings: [], rerankers: [] })
+      } catch (e:any) {
+        message.error('加载模型库失败：' + (e?.response?.data?.detail || e.message))
+      } finally {
+        setRegLoading(false)
+      }
+    }
+  }
+
+  const refreshRegistry = async () => {
     try {
       setRegLoading(true)
       const rr = await api.get('/api/v1/admin/data/models/registry')
       setRegistry(rr.data || { llms: [], embeddings: [], rerankers: [] })
+      message.success('模型库已刷新')
     } catch (e:any) {
-      console.warn('加载模型库失败：' + (e?.response?.data?.detail || e.message))
-      // 模型库加载失败时，提供默认选项避免下拉框空白
-      setRegistry({ 
-        llms: [
-          { id: 'default-llm', label: '默认LLM', model: 'Qwen/Qwen2.5-32B-Instruct', provider: 'siliconflow' }
-        ], 
-        embeddings: [
-          { id: 'default-embedding', label: '默认Embedding', model: 'BAAI/bge-m3', provider: 'siliconflow' }
-        ], 
-        rerankers: [] 
-      })
+      message.error('刷新模型库失败：' + (e?.response?.data?.detail || e.message))
     } finally {
       setRegLoading(false)
     }
-
-    // 然后加载配置
-    try {
-      const r = await api.get('/api/v1/admin/data/models/config')
-      setConfig(r.data)
-      setContexts(r.data.contexts || { inference: {}, evaluation: {} })
-      setOverrides(r.data.scenario_overrides || [])
-      form.setFieldsValue({
-        embedding_model: r.data.embedding_model,
-        llm_model: r.data.llm_model,
-        reranker_model: r.data.reranker_model,
-        base_url: r.data.base_url,
-        rerank_provider: r.data.rerank_provider || 'auto',
-        ragas_llm_model: r.data.ragas_defaults?.llm_model || '',
-        ragas_embedding_model: r.data.ragas_defaults?.embedding_model || '',
-        siliconflow_api_key: '',
-        openai_api_key: '',
-      })
-    } catch (e: any) {
-      message.error('加载配置失败：' + (e?.response?.data?.detail || e.message))
-    }
   }
 
-  useEffect(() => { 
-    load()
-  }, [])
-
-  const loadConfigOnly = async () => {
-    try {
-      const r = await api.get('/api/v1/admin/data/models/config')
-      setConfig(r.data)
-      setContexts(r.data.contexts || { inference: {}, evaluation: {} })
-      setOverrides(r.data.scenario_overrides || [])
-      form.setFieldsValue({
-        embedding_model: r.data.embedding_model,
-        llm_model: r.data.llm_model,
-        reranker_model: r.data.reranker_model,
-        base_url: r.data.base_url,
-        rerank_provider: r.data.rerank_provider || 'auto',
-        ragas_llm_model: r.data.ragas_defaults?.llm_model || '',
-        ragas_embedding_model: r.data.ragas_defaults?.embedding_model || '',
-        siliconflow_api_key: '',
-        openai_api_key: '',
-      })
-    } catch (e: any) {
-      message.error('加载配置失败：' + (e?.response?.data?.detail || e.message))
-    }
-  }
+  useEffect(() => { load() }, [])
   // 自动自检：加载配置后，静默检查推理/评测上下文的连通性
   useEffect(() => {
     if (config) {
@@ -331,7 +309,7 @@ const ModelConfig: React.FC = () => {
         </Row>
       </Card>
 
-      <Card title="模型库（管理与新增）" style={{ marginTop: 16 }}>
+      <Card title="模型库（管理与新增）" style={{ marginTop: 16 }} extra={<Button size='small' onClick={refreshRegistry}>刷新模型库</Button>}>
         <Alert message='在此查看/新增 LLM、Embedding、Reranker。上方下拉框会显示已注册模型。优先使用环境变量名（推荐）。' type='info' showIcon style={{ marginBottom: 12 }} />
 
         <Table

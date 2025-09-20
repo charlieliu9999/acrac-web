@@ -21,6 +21,7 @@ function App() {
   const [enabled, setEnabled] = useState<boolean>(false)
   const [auditOnly, setAuditOnly] = useState<boolean>(true)
   const [sysStatus, setSysStatus] = useState<any>(null)
+  const frontendUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const [statusLoading, setStatusLoading] = useState<boolean>(false)
 
   const selectedKey = React.useMemo(() => {
@@ -79,6 +80,9 @@ function App() {
         <div className="sys-status" style={{ padding: '8px 12px', color: '#fff', fontSize: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>系统状态 {statusLoading ? '…' : ''}</div>
           <Space direction='vertical' size={4} style={{ width: '100%' }}>
+            <div>
+              <Badge status='processing' text={<a href={frontendUrl} target='_blank' rel='noreferrer'>Frontend</a>} />
+            </div>
             <div>
               <Badge status={(sysStatus?.api?.status==='ok')?'success':((sysStatus?.api?.status)?'error':'default')} text='API' />
             </div>
