@@ -71,6 +71,28 @@ const ModelConfig: React.FC = () => {
   }, [registry, config, inferenceCtx, evaluationCtx, overrides])
 
   const load = async () => {
+    // 先加载模型库，确保下拉选项始终可用
+    try {
+      setRegLoading(true)
+      const rr = await api.get('/api/v1/admin/data/models/registry')
+      setRegistry(rr.data || { llms: [], embeddings: [], rerankers: [] })
+    } catch (e:any) {
+      console.warn('加载模型库失败：' + (e?.response?.data?.detail || e.message))
+      // 模型库加载失败时，提供默认选项避免下拉框空白
+      setRegistry({ 
+        llms: [
+          { id: 'default-llm', label: '默认LLM', model: 'Qwen/Qwen2.5-32B-Instruct', provider: 'siliconflow' }
+        ], 
+        embeddings: [
+          { id: 'default-embedding', label: '默认Embedding', model: 'BAAI/bge-m3', provider: 'siliconflow' }
+        ], 
+        rerankers: [] 
+      })
+    } finally {
+      setRegLoading(false)
+    }
+
+    // 然后加载配置
     try {
       const r = await api.get('/api/v1/admin/data/models/config')
       setConfig(r.data)
@@ -87,18 +109,36 @@ const ModelConfig: React.FC = () => {
         siliconflow_api_key: '',
         openai_api_key: '',
       })
-      // 加载模型库
-      try {
-        setRegLoading(true)
-        const rr = await api.get('/api/v1/admin/data/models/registry')
-        setRegistry(rr.data || { llms: [], embeddings: [], rerankers: [] })
-      } catch {} finally { setRegLoading(false) }
     } catch (e: any) {
-      message.error('加载失败：' + (e?.response?.data?.detail || e.message))
+      message.error('加载配置失败：' + (e?.response?.data?.detail || e.message))
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { 
+    load()
+  }, [])
+
+  const loadConfigOnly = async () => {
+    try {
+      const r = await api.get('/api/v1/admin/data/models/config')
+      setConfig(r.data)
+      setContexts(r.data.contexts || { inference: {}, evaluation: {} })
+      setOverrides(r.data.scenario_overrides || [])
+      form.setFieldsValue({
+        embedding_model: r.data.embedding_model,
+        llm_model: r.data.llm_model,
+        reranker_model: r.data.reranker_model,
+        base_url: r.data.base_url,
+        rerank_provider: r.data.rerank_provider || 'auto',
+        ragas_llm_model: r.data.ragas_defaults?.llm_model || '',
+        ragas_embedding_model: r.data.ragas_defaults?.embedding_model || '',
+        siliconflow_api_key: '',
+        openai_api_key: '',
+      })
+    } catch (e: any) {
+      message.error('加载配置失败：' + (e?.response?.data?.detail || e.message))
+    }
+  }
   // 自动自检：加载配置后，静默检查推理/评测上下文的连通性
   useEffect(() => {
     if (config) {
@@ -403,7 +443,7 @@ const ModelConfig: React.FC = () => {
               <Input placeholder='如 Qwen/Qwen3-32B 或 qwen3:30b' />
             </Form.Item>
             <Form.Item name='base_url' label='Base URL' extra='Ollama 建议 http://localhost:11434/v1'>
-              <Input placeholder='如 https://api.siliconflow.cn/v1 或 http://localhost:11434/v1' />
+              <Input id='edit_base_url' placeholder='如 https://api.siliconflow.cn/v1 或 http://localhost:11434/v1' />
             </Form.Item>
             <Form.Item name='api_key_env' label='API Key 环境变量（推荐）'>
               <Input placeholder='如 SILICONFLOW_API_KEY 或 OPENAI_API_KEY' />
@@ -451,7 +491,7 @@ const ModelConfig: React.FC = () => {
           </Row>
           <Row gutter={16}>
             <Col span={8}><Form.Item name='model' label='模型ID' rules={[{required:true}]}><Input placeholder='LLM: Qwen/Qwen2.5-32B-Instruct 或 qwen3:30b; Embedding: BAAI/bge-m3; Reranker: BAAI/bge-reranker-v2-m3' /></Form.Item></Col>
-            <Col span={8}><Form.Item name='base_url' label='Base URL'><Input placeholder='https://api.siliconflow.cn/v1 或 http://localhost:11434/v1' /></Form.Item></Col>
+            <Col span={8}><Form.Item name='base_url' label='Base URL'><Input id='registry_base_url' placeholder='https://api.siliconflow.cn/v1 或 http://localhost:11434/v1' /></Form.Item></Col>
             <Col span={8}><Form.Item name='api_key_env' label='API Key ENV（推荐）'><Input placeholder='SILICONFLOW_API_KEY 或 OPENAI_API_KEY' /></Form.Item></Col>
           </Row>
           <Row gutter={16}>
@@ -525,7 +565,7 @@ const ModelConfig: React.FC = () => {
                     </Col>
                     <Col span={12}>
                       <Form.Item name='base_url' label='Base URL'>
-                        <Input placeholder='https://api.siliconflow.cn/v1' />
+                        <Input id='inference_base_url' placeholder='https://api.siliconflow.cn/v1' />
                       </Form.Item>
                     </Col>
                   </Row>

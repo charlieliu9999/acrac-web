@@ -11,7 +11,7 @@ from app.core.config import settings
 
 router = APIRouter()
 
-# 统一定位到 backend 根目录（容器内为 /app，本地为 backend/）
+# 统一定位到 backend 目录（更稳健的层级）
 BACKEND_DIR = Path(__file__).resolve().parents[4]
 UPLOAD_DIR = BACKEND_DIR / 'uploads'
 SCRIPTS_DIR = BACKEND_DIR / 'scripts'
