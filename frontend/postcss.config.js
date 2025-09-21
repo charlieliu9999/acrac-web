@@ -1,5 +1,5 @@
 // PostCSS配置文件 - 专为 React + Ant Design 项目优化
-module.exports = {
+export default {
   plugins: {
     // 自动添加浏览器前缀
     autoprefixer: {
@@ -12,7 +12,7 @@ module.exports = {
       grid: 'autoplace',
       remove: true
     },
-
+    
     // CSS优化插件（仅生产环境）
     ...(process.env.NODE_ENV === 'production' ? {
       // CSS压缩

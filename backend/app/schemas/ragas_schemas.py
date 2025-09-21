@@ -86,18 +86,12 @@ class RAGASEvaluationRequest(BaseModel):
     test_cases: Optional[List[TestCaseBase]] = Field(None, description="测试用例列表")
     scenario_ids: Optional[List[int]] = Field(None, description="临床场景ID列表")
     batch_id: Optional[str] = Field(None, description="数据批次ID")
-    # 选择的模型（用于RAGAS评分用的LLM）；默认保持向后兼容
-    model_name: str = Field("gpt-3.5-turbo", description="LLM模型名称")
-    # 选择的Embedding模型（用于RAGAS中的向量检索/相关性）
-    embedding_model: Optional[str] = Field(None, description="Embedding模型名称（可选）")
-    # 覆盖模型API地址
+    model_name: str = Field("gpt-3.5-turbo", description="模型名称")
     base_url: Optional[str] = Field("https://api.siliconflow.cn/v1", description="模型API基础URL")
-    # 限制本次评测数量；>0 时取前N条，-1 或 None 表示全部
-    data_count: Optional[int] = Field(None, description="本次评测的最大用例数（可选）")
     evaluation_config: Optional[Dict[str, Any]] = Field(None, description="评测配置")
     task_name: Optional[str] = Field(None, description="任务名称")
     async_mode: bool = Field(True, description="是否异步执行")
-
+    
     def validate_input(self):
         """验证输入参数"""
         provided_params = sum([
@@ -106,7 +100,7 @@ class RAGASEvaluationRequest(BaseModel):
             bool(self.scenario_ids),
             bool(self.batch_id)
         ])
-
+        
         if provided_params == 0:
             raise ValueError("必须提供test_cases、file_id、scenario_ids或batch_id中的一个")
         if provided_params > 1:
@@ -125,6 +119,13 @@ class EvaluationResult(BaseModel):
     clinical_query: str = Field(..., description="临床查询")
     ground_truth: str = Field(..., description="标准答案")
     ragas_scores: RAGASScores = Field(..., description="RAGAS评分")
+    # 可选扩展字段（用于‘中间/最终结果’展示）
+    rag_answer: Optional[str] = Field(None, description="RAG-LLM生成的答案文本")
+    contexts: Optional[List[str]] = Field(None, description="用于评测的上下文片段")
+    model: Optional[str] = Field(None, description="推理/评测使用的LLM模型名")
+    inference_ms: Optional[int] = Field(None, description="推理耗时（毫秒）")
+    evaluation_ms: Optional[int] = Field(None, description="评测耗时（毫秒）")
+    trace: Optional[Dict[str, Any]] = Field(None, description="推理trace（裁剪版）")
     timestamp: float = Field(..., description="时间戳")
     metadata: Optional[Dict[str, Any]] = Field(None, description="元数据")
 
@@ -135,7 +136,6 @@ class RAGASEvaluationResponse(BaseModel):
     results: Optional[List[EvaluationResult]] = Field(None, description="评测结果")
     summary: Optional[RAGASScores] = Field(None, description="综合评分")
     processing_time: Optional[float] = Field(None, description="处理时间")
-    output_filename: Optional[str] = Field(None, description="导出文件名（同步/导出时返回）")
     error: Optional[str] = Field(None, description="错误信息")
 
 # ==================== 任务管理相关 ====================

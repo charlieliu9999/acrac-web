@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { Button, Card, Col, Collapse, Form, Input, InputNumber, Row, Switch, Table, Tag, Tooltip, Typography, Space } from 'antd'
+import React, { useMemo, useState, useRef } from 'react'
+import { Button, Card, Col, Collapse, Form, Input, InputNumber, Row, Switch, Table, Tag, Tooltip, Typography, Space, message, Steps } from 'antd'
 import { api } from '../api/http'
 
 const { Text, Paragraph } = Typography
@@ -8,9 +8,19 @@ const RAGAssistant: React.FC = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [currentStep, setCurrentStep] = useState<number>(0)
+  const [stepsVisible, setStepsVisible] = useState<boolean>(false)
+
+  const [ragasTaskId, setRagasTaskId] = useState<string | null>(null)
+  const [ragasStatus, setRagasStatus] = useState<string | null>(null)
+  const [ragasData, setRagasData] = useState<any>(null)
+  const ragasTimerRef = useRef<number | null>(null)
 
   const onFinish = async (values: any) => {
     setLoading(true)
+    setStepsVisible(true)
+    setCurrentStep(0)
+    message.loading({ content: '准备请求', key: 'rag-flow', duration: 0 })
     try {
       const payload = {
         clinical_query: values.query,
@@ -23,8 +33,31 @@ const RAGAssistant: React.FC = () => {
         compute_ragas: values.compute_ragas || false,
         ground_truth: values.ground_truth || undefined
       }
+      setCurrentStep(1)
+      message.loading({ content: '已发送请求，等待后端…', key: 'rag-flow', duration: 0 })
       const r = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', payload)
+      // 收到响应：若包含评测，则将进度切到“评价中”，由异步任务完成后再切到“渲染结果”
+      if (payload.compute_ragas) setCurrentStep(2)
+      message.loading({ content: payload.compute_ragas ? '评价中…' : '已收到响应，渲染中…', key: 'rag-flow', duration: 0 })
       setResult(r.data)
+      // 自动上传到服务端持久化
+      try { await uploadToServer() } catch {}
+      if (payload.compute_ragas) {
+        // 异步发起评测并轮询
+        startRagasEvaluation(values, r.data)
+        message.success({ content: '推荐已完成，已启动评测', key: 'rag-flow' })
+      } else {
+        setCurrentStep(3)
+        message.success({ content: '推荐已完成', key: 'rag-flow' })
+      }
+      // 轻量刷新：强制表格重绘，确保视图更新
+      setTimeout(() => {
+        const el = document.querySelector('#final-recs')
+        if (el && 'scrollIntoView' in el) (el as any).scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || '请求失败'
+      message.error({ content: `推荐失败：${detail}`, key: 'rag-flow' })
     } finally {
       setLoading(false)
     }
@@ -52,6 +85,135 @@ const RAGAssistant: React.FC = () => {
   ],[])
 
   const trace = result?.trace || {}
+
+  const exportJSON = () => {
+    if (!result) return
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `rag_result_${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  const copyTrace = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(result?.trace || {}, null, 2))
+      message.success('Trace 已复制到剪贴板')
+    } catch (e) {
+      message.error('复制失败')
+    }
+  }
+  const saveLocal = () => {
+    try {
+      const key = `rag-run:${Date.now()}`
+      localStorage.setItem(key, JSON.stringify(result || {}))
+      message.success(`已保存到本地（键：${key}）`)
+    } catch (e) {
+      message.error('保存失败')
+    }
+  }
+  const clearRagasTimer = () => {
+    if (ragasTimerRef.current) {
+      window.clearInterval(ragasTimerRef.current)
+      ragasTimerRef.current = null
+    }
+  }
+
+  const startRagasEvaluation = async (values: any, respData: any) => {
+    try {
+      const testCase = {
+        clinical_query: values.query,
+        ground_truth: values.ground_truth || ''
+      }
+      const modelName = respData?.model_used || respData?.trace?.models?.llm_model || 'unknown'
+      const req = {
+        test_cases: [testCase],
+        model_name: modelName,
+        async_mode: true
+      }
+      const r = await api.post('/api/v1/ragas/evaluate', req)
+      const tid = r.data?.task_id
+      if (!tid) {
+        throw new Error('未返回任务ID')
+      }
+      setRagasTaskId(tid)
+      setRagasStatus('processing')
+      // 轮询任务状态
+      clearRagasTimer()
+      ragasTimerRef.current = window.setInterval(async () => {
+        try {
+          const st = await api.get(`/api/v1/ragas/evaluate/${tid}/status`)
+          const status = st.data?.status || st.data?.status?.toLowerCase?.()
+          if (status) setRagasStatus(status)
+          if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+            clearRagasTimer()
+            if (status === 'completed') {
+              const detail = await api.get(`/api/v1/ragas/evaluate/${tid}/results`)
+              setRagasData(detail.data)
+              message.success('评测已完成')
+            } else if (status === 'failed') {
+              message.error('评测失败')
+            } else {
+              message.info('评测已取消')
+            }
+            setCurrentStep(3)
+          }
+        } catch (e:any) {
+          // 轮询错误不终止，短暂提示
+          console.warn('poll ragas status error', e?.message)
+        }
+      }, 1500)
+    } catch (e:any) {
+      message.error('创建评测任务失败：' + (e?.response?.data?.detail || e.message))
+    }
+  }
+
+  const cancelRagas = async () => {
+    if (!ragasTaskId) return
+    try {
+      await api.delete(`/api/v1/ragas/evaluate/${ragasTaskId}`)
+      clearRagasTimer()
+      setRagasStatus('cancelled')
+      message.success('已取消评测')
+    } catch (e:any) {
+      message.error('取消失败：' + (e?.response?.data?.detail || e.message))
+    }
+  }
+
+
+
+  const resetSession = () => {
+    // 清理评测轮询
+    clearRagasTimer()
+    setRagasTaskId(null)
+    setRagasStatus(null)
+    setRagasData(null)
+    // 清理推荐展示
+    setResult(null)
+    setStepsVisible(false)
+    setCurrentStep(0)
+    message.info('已开始新的会话，状态已清空')
+  }
+
+
+  const uploadToServer = async () => {
+    if (!result) return
+    try {
+      const payload = {
+        query_text: result?.query || form.getFieldValue('query') || '',
+        result,
+        success: result?.success !== false,
+        execution_time_ms: result?.processing_time_ms || result?.trace?.timing?.total_ms || 0,
+        inference_method: result?.is_low_similarity_mode ? 'no-rag' : 'rag',
+        error_message: result?.message || null,
+      }
+      await api.post('/api/v1/acrac/rag-llm/runs/log', payload)
+      message.success('已上传到服务端')
+    } catch (e:any) {
+      message.error('上传失败：' + (e?.response?.data?.detail || e.message))
+    }
+  }
 
   const getReason = (r:any) => (r?.recommendation_reason || r?.reason_zh || r?.reason || r?.justification || '') as string
 
@@ -89,19 +251,48 @@ const RAGAssistant: React.FC = () => {
             </Form.Item>
           </Col>
         </Row>
-        <Button type='primary' htmlType='submit' loading={loading}>运行推荐</Button>
+        <Space>
+          <Button type='primary' htmlType='submit' loading={loading}>运行推荐</Button>
+          <Button onClick={resetSession} disabled={loading}>开始新的会话</Button>
+        </Space>
       </Form>
+
+      {(loading || stepsVisible) && (
+        <Card title='执行状态' size='small' style={{ marginTop: 12 }}>
+          <Steps size='small' current={currentStep} items={[
+            { title: '准备请求' },
+            { title: '推理中' },
+            { title: '评价中' },
+            { title: '渲染结果' },
+          ]} />
+          {ragasTaskId && (
+            <div style={{ marginTop: 8 }}>
+              <Space>
+                <Text type='secondary'>  评估任务：</Text>
+                <Tag color={ragasStatus==='completed'?'green':ragasStatus==='failed'?'red':ragasStatus==='cancelled'?'orange':'blue'}>
+                  {ragasStatus || 'processing'}
+                </Tag>
+                {ragasStatus==='processing' && (
+                  <Button size='small' danger onClick={cancelRagas}>停止评测</Button>
+                )}
+              </Space>
+            </div>
+          )}
+
+        </Card>
+      )}
 
       {result && (
         <div style={{ marginTop: 16 }}>
           {/* 改为上下布局，提升“推荐理由”显示宽度 */}
-          <Card title='最终推荐'>
+          <Card id='final-recs' title='最终推荐'>
             <Table
               rowKey={(r:any)=>r.rank}
               size='small'
               dataSource={result.llm_recommendations?.recommendations || []}
               columns={recColumns}
               pagination={false}
+
               expandable={{
                 expandedRowRender: (r:any) => (
                   <div style={{ whiteSpace:'pre-wrap' }}>
@@ -165,6 +356,22 @@ const RAGAssistant: React.FC = () => {
             ]} />
           </Card>
 
+          <Card title='执行耗时与保存' style={{ marginTop: 12 }}>
+            <div>总耗时：{result.processing_time_ms ?? result.trace?.timing?.total_ms} ms</div>
+            <div style={{ marginTop: 6 }}>
+              <Text type='secondary'>分步耗时：</Text>
+              <pre className='mono' style={{ whiteSpace:'pre-wrap' }}>{JSON.stringify(result.trace?.timing || {}, null, 2)}</pre>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <Space>
+                <Button onClick={exportJSON}>导出结果JSON</Button>
+                <Button onClick={copyTrace}>复制 Trace</Button>
+                <Button onClick={saveLocal}>保存到本地</Button>
+                <Button type='primary' onClick={uploadToServer}>上传到服务端</Button>
+              </Space>
+            </div>
+          </Card>
+
           <Row gutter={12} style={{ marginTop: 12 }}>
             <Col span={12}>
               <Card title='规则审计'>
@@ -189,19 +396,27 @@ const RAGAssistant: React.FC = () => {
           <Row gutter={12} style={{ marginTop: 12 }}>
             <Col span={24}>
               <Card title='RAGAS 评估'>
-                <div>上下文片段数：{trace.ragas_contexts_count ?? 0}</div>
-                {trace.ragas_scores ? (
+                {ragasData ? (
                   <pre className='mono' style={{ whiteSpace:'pre-wrap' }}>
-                    {JSON.stringify(trace.ragas_scores, null, 2)}
+                    {JSON.stringify(ragasData, null, 2)}
                   </pre>
                 ) : (
-                  <div style={{ marginTop: 8 }}>
-                    {form.getFieldValue('compute_ragas') ? (
-                      <span>{trace.ragas_error ? `评测错误：${trace.ragas_error}` : '未返回评分（可能缺少参考答案或服务未启用）'}</span>
+                  <>
+                    <div>上下文片段数：{trace.ragas_contexts_count ?? 0}</div>
+                    {trace.ragas_scores ? (
+                      <pre className='mono' style={{ whiteSpace:'pre-wrap' }}>
+                        {JSON.stringify(trace.ragas_scores, null, 2)}
+                      </pre>
                     ) : (
-                      <span>未启用RAGAS评测</span>
+                      <div style={{ marginTop: 8 }}>
+                        {form.getFieldValue('compute_ragas') ? (
+                          <span>{trace.ragas_error ? `评测错误：${trace.ragas_error}` : '未返回评分（可能缺少参考答案或服务未启用）'}</span>
+                        ) : (
+                          <span>未启用RAGAS评测</span>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </Card>
             </Col>

@@ -20,7 +20,8 @@ const DataImport: React.FC = () => {
       try {
         const form = new FormData()
         form.append('file', options.file)
-        const r = await api.post('/api/v1/admin/data/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+        // 不手动设置 Content-Type，交由浏览器自动附加 boundary
+        const r = await api.post('/api/v1/admin/data/upload', form)
         setFilePath(r.data.path)
         message.success('上传成功')
         options.onSuccess(r.data)

@@ -14,49 +14,6 @@ try:
         context_recall
     )
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-    # 兼容适配：ragas 0.1.9 仍调用 set_run_config，而 LangChain 0.2.x 提供的是 with_config。
-    # 提供一个轻量包装，转发 set_run_config -> with_config，避免不必要的依赖升级。
-    class ChatOpenAICompat(ChatOpenAI):
-        def set_run_config(self, run_config):  # type: ignore[override]
-            try:
-                # 在 LangChain 0.2.x 中推荐使用 with_config
-                return self.with_config(run_config)
-            except Exception:
-                # 退化为返回自身，保持接口可用
-                return self
-
-        # 兼容 RAGAS 0.1.x 在部分路径上传入 PromptValue 的情况
-        # LangChain 0.2.x 的 ChatModel.generate 期望的是 List[List[BaseMessage]] 或 ChatPromptValue
-        # 如果拿到的是 PromptValue 且无 __len__，将其转换为 messages 列表并包成 batch
-        async def generate(self, messages, **kwargs):  # type: ignore[override]
-            # 移除 RAGAS 传入但 OpenAI SDK 不支持的参数，避免 Completions.create(is_async=...) 报错
-            kwargs.pop('is_async', None)
-            try:
-                # 将 PromptValue/ChatPromptValue 统一转为消息列表
-                if hasattr(messages, "to_messages"):
-                    messages = messages.to_messages()
-                # 若是单轮消息列表，则包成批量 [[...]]
-                if isinstance(messages, list):
-                    if not messages or (messages and not isinstance(messages[0], list)):
-                        messages = [messages]
-                return await super().agenerate(messages, **kwargs)
-            except TypeError:
-                # 再尝试一次保守转换
-                if hasattr(messages, "to_messages"):
-                    m = messages.to_messages()
-                else:
-                    m = messages
-                if isinstance(m, list) and (not m or not isinstance(m[0], list)):
-                    m = [m]
-                return await super().agenerate(m, **kwargs)
-
-        async def agenerate(self, messages, **kwargs):  # explicit async wrapper for safety
-            kwargs.pop('is_async', None)
-            if hasattr(messages, "to_messages"):
-                messages = messages.to_messages()
-            if isinstance(messages, list) and (not messages or not isinstance(messages[0], list)):
-                messages = [messages]
-            return await super().agenerate(messages, **kwargs)
     RAGAS_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"RAGAS相关依赖未安装: {e}")
@@ -66,71 +23,67 @@ logger = logging.getLogger(__name__)
 
 class RAGASEvaluator:
     """RAGAS评估器"""
-
-    def __init__(
-        self,
-        llm_model: Optional[str] = None,
-        embedding_model: Optional[str] = None,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        temperature: float = 0.1,
-        max_tokens: int = 2048,
-    ):
-        """初始化RAGAS评估器，允许按次选择模型
-        llm_model/embedding_model/base_url/api_key 未提供时，从环境变量读取：
-        - LLM:   SILICONFLOW_LLM_MODEL or OPENAI_MODEL
-        - EMB:   SILICONFLOW_EMBEDDING_MODEL
-        - KEY:   OPENAI_API_KEY or SILICONFLOW_API_KEY
-        - URL:   OPENAI_BASE_URL or https://api.siliconflow.cn/v1
-        """
+    
+    def __init__(self):
+        """初始化RAGAS评估器（完全采用可配置的 evaluation 上下文，无硬编码模型）"""
         if not RAGAS_AVAILABLE:
             raise ImportError("RAGAS相关依赖未安装，请安装ragas、langchain-openai等依赖")
 
-        # API 配置
-        # 首选传入的 base_url，其次根据模型名做启发式选择（Ollama 优先），否则回退到环境变量顺序
-        _llm = llm_model or os.getenv("SILICONFLOW_LLM_MODEL") or ""
-        _emb = embedding_model or os.getenv("SILICONFLOW_EMBEDDING_MODEL") or ""
-        prefer_ollama = (":" in str(_llm)) or (":" in str(_emb))
-        if base_url:
-            self.base_url = base_url
-        elif prefer_ollama and os.getenv("OLLAMA_BASE_URL"):
-            self.base_url = os.getenv("OLLAMA_BASE_URL")
-        else:
-            self.base_url = (
-                os.getenv("OPENAI_BASE_URL")
-                or os.getenv("SILICONFLOW_BASE_URL")
-                or os.getenv("OLLAMA_BASE_URL")
-                or "https://api.siliconflow.cn/v1"
-            )
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("SILICONFLOW_API_KEY")
-        # 兼容本地 Ollama（OpenAI 兼容端点通常不需要密钥）
+        # 读取后端配置文件 backend/config/model_contexts.json
+        from pathlib import Path
+        import json
+        contexts_path = Path(__file__).resolve().parents[2] / "config" / "model_contexts.json"
+        contexts = {}
+        if contexts_path.exists():
+            try:
+                contexts = json.loads(contexts_path.read_text(encoding="utf-8")) or {}
+            except Exception as e:
+                logger.warning(f"读取 model_contexts.json 失败: {e}")
+        eva = ((contexts.get('contexts') or {}).get('evaluation')) or {}
+
+        # 从 evaluation 上下文与环境变量解析 LLM/Embedding/base_url 与超参
+        # 优先 evaluation 上下文，其次 RAGAS_* 环境变量，最后回退到 SiliconFlow 默认
+        self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("SILICONFLOW_API_KEY")
+        self.base_url = (
+            eva.get('base_url')
+            or os.getenv('RAGAS_DEFAULT_BASE_URL')
+            or os.getenv('SILICONFLOW_BASE_URL')
+            or "https://api.siliconflow.cn/v1"
+        )
         if not self.api_key:
-            base_lower = (self.base_url or "").lower()
-            if ("localhost:11434" in base_lower) or ("127.0.0.1:11434" in base_lower) or ("/v1" in base_lower and "ollama" in base_lower):
-                # 占位密钥以满足 OpenAI SDK 的参数要求
-                self.api_key = "ollama"
-            else:
-                raise ValueError("未找到API密钥，请设置OPENAI_API_KEY或SILICONFLOW_API_KEY环境变量")
+            raise ValueError("未找到API密钥，请设置 SILICONFLOW_API_KEY 或 OPENAI_API_KEY")
 
-        # 模型名称（允许来自 .env）
-        llm_model = llm_model or os.getenv("SILICONFLOW_LLM_MODEL") or "gpt-3.5-turbo"
-        embedding_model = embedding_model or os.getenv("SILICONFLOW_EMBEDDING_MODEL") or "BAAI/bge-large-zh-v1.5"
+        llm_model = (
+            eva.get('llm_model')
+            or os.getenv('RAGAS_DEFAULT_LLM_MODEL')
+            or os.getenv('SILICONFLOW_LLM_MODEL')
+            or "Qwen/Qwen3-32B"
+        )
+        emb_model = (
+            eva.get('embedding_model')
+            or os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL')
+            or os.getenv('SILICONFLOW_EMBEDDING_MODEL')
+            or "BAAI/bge-m3"
+        )
+        temperature = float(str(eva.get('temperature') if eva.get('temperature') is not None else os.getenv('RAGAS_TEMPERATURE', '0.1')))
+        top_p = float(str(eva.get('top_p') if eva.get('top_p') is not None else os.getenv('RAGAS_TOP_P', '0.7')))
 
-        # 初始化模型
-        self.llm = ChatOpenAICompat(
+        # 初始化模型（不强制 max_tokens，遵循用户“不要限制”要求）
+        self.llm = ChatOpenAI(
             model=llm_model,
             api_key=self.api_key,
             base_url=self.base_url,
             temperature=temperature,
-            max_tokens=max_tokens,
+            top_p=top_p,
         )
         self.embeddings = OpenAIEmbeddings(
-            model=embedding_model,
+            model=emb_model,
             api_key=self.api_key,
-            base_url=self.base_url,
+            base_url=self.base_url
         )
-
-        logger.info(f"RAGAS LLM type: {self.llm.__class__.__name__}")
+        # 记录模型名，便于在结果中写入评测模型信息
+        self.llm_model_name = llm_model
+        self.embedding_model_name = emb_model
 
         # 配置RAGAS指标
         faithfulness.llm = self.llm
@@ -142,8 +95,8 @@ class RAGASEvaluator:
 
         self.metrics = [faithfulness, answer_relevancy, context_precision, context_recall]
 
-        logger.info("RAGAS评估器初始化完成")
-
+        logger.info(f"RAGAS评估器初始化完成（LLM={llm_model}, Embedding={emb_model}）")
+    
     def prepare_ragas_dataset(self, test_data: List[Dict[str, Any]]) -> Dataset:
         """准备RAGAS兼容的数据集"""
         try:
@@ -179,28 +132,14 @@ class RAGASEvaluator:
                 embeddings=self.embeddings
             )
             
-            # 提取评分并处理NaN值（兼容 ragas 不同返回结构：标量、列表、ndarray、Series 等）
-            def _first(val: Any) -> float:
-                try:
-                    if isinstance(val, (list, tuple)):
-                        val = val[0] if val else float('nan')
-                    elif hasattr(val, 'tolist'):
-                        arr = val.tolist()
-                        val = arr[0] if isinstance(arr, (list, tuple)) and arr else arr
-                    elif hasattr(val, 'item'):
-                        val = val.item()
-                    v = float(val)
-                    return 0.0 if (v != v) else v  # NaN -> 0.0
-                except Exception:
-                    return 0.0
-
+            # 提取评分并处理NaN值
             scores = {
-                'faithfulness': _first(result.get('faithfulness')),
-                'answer_relevancy': _first(result.get('answer_relevancy')),
-                'context_precision': _first(result.get('context_precision')),
-                'context_recall': _first(result.get('context_recall')),
+                'faithfulness': float(result['faithfulness'][0]) if not np.isnan(result['faithfulness'][0]) else 0.0,
+                'answer_relevancy': float(result['answer_relevancy'][0]) if not np.isnan(result['answer_relevancy'][0]) else 0.0,
+                'context_precision': float(result['context_precision'][0]) if not np.isnan(result['context_precision'][0]) else 0.0,
+                'context_recall': float(result['context_recall'][0]) if not np.isnan(result['context_recall'][0]) else 0.0
             }
-
+            
             logger.info(f"单个样本评估完成: {scores}")
             return scores
             

@@ -14,7 +14,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.schemas.ragas_schemas import TestCaseBase, EvaluationResult, TaskStatus
-from app.core.config import settings
 from app.models.ragas_models import EvaluationTask, ScenarioResult, EvaluationMetrics
 
 # 配置日志
@@ -164,48 +163,10 @@ def validate_test_cases(test_cases: List[TestCaseBase]) -> tuple[List[TestCaseBa
     
     return valid_cases, errors
 
-def _simple_ragas_scores(answer: str, contexts: List[str], reference: str) -> Dict[str, float]:
-    """在无LLM/Embedding可用时的启发式评分，范围[0,1]。
-    - answer_relevancy: 与参考答案Token的Jaccard相似度
-    - context_precision: 答案Token中出现在上下文Token集合中的比例
-    - context_recall: 上下文Token集合中被答案覆盖的比例（按并集去重）
-    - faithfulness: 0.7*precision + 0.3*relevancy 的折中
-    """
-    import re
-    def tokens(text: str) -> set:
-        if not text:
-            return set()
-        # 中英文混合：中文按字，英文按词
-        ts = re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9_]+", str(text))
-        return set(t.strip().lower() for t in ts if t.strip())
-    ans = tokens(answer)
-    ref = tokens(reference)
-    ctx_union: set = set()
-    for c in contexts or []:
-        ctx_union |= tokens(c)
-    def jacc(a: set, b: set) -> float:
-        if not a and not b:
-            return 0.0
-        inter = len(a & b)
-        union = len(a | b) or 1
-        return inter / union
-    relevancy = jacc(ans, ref)
-    precision = (len(ans & ctx_union) / (len(ans) or 1)) if ans else 0.0
-    recall = (len(ans & ctx_union) / (len(ctx_union) or 1)) if ctx_union else 0.0
-    faith = min(1.0, 0.7 * precision + 0.3 * relevancy)
-    return {
-        "faithfulness": round(float(faith), 6),
-        "answer_relevancy": round(float(relevancy), 6),
-        "context_precision": round(float(precision), 6),
-        "context_recall": round(float(recall), 6),
-    }
-
 async def run_real_rag_evaluation(
     test_cases: List[Dict[str, Any]],
     model_name: str,
     base_url: Optional[str] = None,
-    embedding_model: Optional[str] = None,
-    data_count: Optional[int] = None,
     task_id: Optional[str] = None,
     db: Optional[Session] = None,
 ) -> Dict[str, Any]:
@@ -219,13 +180,12 @@ async def run_real_rag_evaluation(
     - RAG_API_URL 不可用时，单条用例计为失败但不中断整体流程
     - RAGAS 依赖缺失或 API Key 缺失时，自动跳过评分，记 0 分
     """
-    # 优先取环境变量 RAG_API_URL；否则使用 settings.RAG_API_URL（配置文件/环境统一管理）
-    rag_api_url = os.getenv("RAG_API_URL", settings.RAG_API_URL)
+    rag_api_url = os.getenv(
+        "RAG_API_URL",
+        "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation",
+    )
 
     evaluation_results: List[Dict[str, Any]] = []
-    # 如指定 data_count 且 > 0，则仅评前 N 条
-    if data_count and isinstance(data_count, int) and data_count > 0:
-        test_cases = (test_cases or [])[:data_count]
     total_cases = len(test_cases or [])
     completed_cases = 0
     failed_cases = 0
@@ -234,14 +194,7 @@ async def run_real_rag_evaluation(
     ragas_evaluator = None
     try:
         from app.services.ragas_evaluator import RAGASEvaluator  # type: ignore
-        # 默认到环境变量指定的RAGAS默认模型（如未提供）
-        _llm = model_name or os.getenv("RAGAS_DEFAULT_LLM_MODEL")
-        _emb = embedding_model or os.getenv("RAGAS_DEFAULT_EMBEDDING_MODEL")
-        ragas_evaluator = RAGASEvaluator(
-            llm_model=_llm,
-            embedding_model=_emb,
-            base_url=base_url,
-        )
+        ragas_evaluator = RAGASEvaluator()
     except Exception as e:
         logger.warning(f"RAGAS评估器初始化失败，将跳过RAGAS评分: {e}")
 
@@ -275,10 +228,8 @@ async def run_real_rag_evaluation(
 
             # 调用 RAG-LLM HTTP API
             try:
-                import httpx  # prefer async client to avoid self-call deadlocks
                 inference_started_at = datetime.now()
-                async with httpx.AsyncClient(timeout=120.0) as client:
-                    resp = await client.post(rag_api_url, json=rag_payload)
+                resp = requests.post(rag_api_url, json=rag_payload, timeout=120)
                 resp.raise_for_status()
                 rag_result = resp.json()
                 inference_completed_at = datetime.now()
@@ -310,50 +261,61 @@ async def run_real_rag_evaluation(
             else:
                 answer_text = "暂无推荐的影像学检查"
 
-            # 提取场景上下文（用于 RAGAS 评分）
-            # 优先从 trace/debug_info 与 scenarios_with_recommendations 中提取可读文本证据
-            contexts: List[str] = []
-            try:
-                tr = (rag_result or {}).get("trace") or {}
+            # 构造/兜底 trace（以便前端中间过程展示）
+            trace = (rag_result or {}).get("trace") or {}
+            if not trace:
+                scenarios = (rag_result or {}).get("scenarios") or []
+                # 构造 recall 视图
+                recall_list = []
+                for s in scenarios:
+                    recall_list.append({
+                        "id": s.get("semantic_id") or s.get("id"),
+                        "similarity": s.get("similarity"),
+                        "panel": s.get("panel_name"),
+                        "topic": s.get("topic_name"),
+                        "_rerank_score": s.get("_rerank_score"),
+                    })
+                # 构造 rerank 视图
+                rerank_list = sorted(
+                    recall_list,
+                    key=lambda x: (
+                        x.get("_rerank_score") is None,
+                        -(x.get("_rerank_score") or 0.0),
+                        -(x.get("similarity") or 0.0),
+                    ),
+                )
+                # 最终 prompt 预览/长度
                 dbg = (rag_result or {}).get("debug_info") or {}
-                # 1) 从 prompt 预览作为整体上下文（包含场景描述与相似度等信息）
-                prm = dbg.get("step_6_prompt_preview")
-                if isinstance(prm, str) and len(prm) > 0:
-                    contexts.append(prm)
-                # 2) 从带推荐理由的场景中提取中文描述与 reasoning
-                swr = (rag_result or {}).get("scenarios_with_recommendations") or []
-                for s in swr[:3]:
-                    desc = s.get("description_zh") or s.get("scenario_description")
-                    if isinstance(desc, str) and desc:
-                        contexts.append(desc)
-                    recs = s.get("recommendations") or []
-                    for rec in recs[:2]:  # 每个场景取前2条理由
-                        rz = rec.get("reasoning_zh") or rec.get("recommendation_reason")
-                        if isinstance(rz, str) and rz:
-                            contexts.append(rz)
-                # 3) 回退：若仍为空，用简要的场景元数据
-                if not contexts:
-                    for sc in (rag_result or {}).get("scenarios", [])[:3]:
-                        try:
-                            ctx = f"场景: {sc.get('panel_name','')} - {sc.get('topic_name','')}"
-                            desc = sc.get("description_zh") or sc.get("clinical_context")
-                            if desc:
-                                ctx += f"\n描述: {desc}"
-                            contexts.append(ctx)
-                        except Exception:
-                            continue
-            except Exception:
-                pass
+                final_prompt = dbg.get("step_6_prompt_preview") if isinstance(dbg.get("step_6_prompt_preview"), str) else None
+                trace = {
+                    "recall_scenarios": recall_list,
+                    "rerank_scenarios": rerank_list,
+                    "final_prompt": final_prompt,
+                    "llm_parsed": (rag_result or {}).get("llm_recommendations") or {},
+                }
+
+            # 提取场景上下文（用于 RAGAS 评分）
+            contexts: List[str] = []
+            for sc in (rag_result or {}).get("scenarios", [])[:3]:
+                try:
+                    ctx = f"场景: {sc.get('panel_name','')} - {sc.get('topic_name','')}"
+                    if sc.get("clinical_scenario"):
+                        ctx += f"\n临床场景: {sc['clinical_scenario']}"
+                    contexts.append(ctx)
+                except Exception:
+                    continue
 
             # 计算 RAGAS 分数（若可用）
             evaluation_started_at = None
             evaluation_completed_at = None
-            # 评分：优先使用RAGAS评估器
-            # 若未能初始化评估器或上下文不足，默认不生成“伪造”分数（可通过环境变量显式开启）
-            allow_heuristic = (os.getenv("RAGAS_ALLOW_HEURISTIC", "false").lower() == "true")
-            ragas_scores: Optional[Dict[str, float]] = None
-            try:
-                if ragas_evaluator and contexts and answer_text and ground_truth:
+            ragas_scores = {
+                "faithfulness": 0.0,
+                "answer_relevancy": 0.0,
+                "context_precision": 0.0,
+                "context_recall": 0.0,
+            }
+            if ragas_evaluator and contexts and answer_text and ground_truth:
+                try:
                     evaluation_started_at = datetime.now()
                     ragas_scores = ragas_evaluator.evaluate_single_sample(
                         {
@@ -364,55 +326,43 @@ async def run_real_rag_evaluation(
                         }
                     )
                     evaluation_completed_at = datetime.now()
-                    # 若评估器返回全0，且允许启发式，则启发式兜底
-                    if ragas_scores and allow_heuristic:
-                        try:
-                            vals = [float(ragas_scores.get(k, 0.0) or 0.0) for k in ("faithfulness","answer_relevancy","context_precision","context_recall")]
-                            if sum(vals) == 0.0:
-                                ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
-                        except Exception:
-                            pass
-                elif allow_heuristic:
-                    ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
-            except Exception as e:
-                logger.warning(f"RAGAS评分计算失败: {e}")
-                if allow_heuristic:
-                    ragas_scores = _simple_ragas_scores(answer_text, contexts, ground_truth)
+                except Exception as e:
+                    logger.warning(f"RAGAS评分计算失败，已跳过该样本评分: {e}")
+                    evaluation_completed_at = datetime.now() if evaluation_started_at else None
 
             # 单条整体得分
-            overall_score = None
-            if ragas_scores:
-                try:
-                    overall_score = (
-                        float(ragas_scores.get("faithfulness", 0.0) or 0.0)
-                        + float(ragas_scores.get("answer_relevancy", 0.0) or 0.0)
-                        + float(ragas_scores.get("context_precision", 0.0) or 0.0)
-                        + float(ragas_scores.get("context_recall", 0.0) or 0.0)
-                    ) / 4.0
-                except Exception:
-                    overall_score = None
+            try:
+                overall_score = (
+                    ragas_scores.get("faithfulness", 0.0)
+                    + ragas_scores.get("answer_relevancy", 0.0)
+                    + ragas_scores.get("context_precision", 0.0)
+                    + ragas_scores.get("context_recall", 0.0)
+                ) / 4.0
+            except Exception:
+                overall_score = None
 
             # 写入数据库（若提供）
             if db and task_id:
                 sr = ScenarioResult(
                     task_id=task_id,
                     scenario_id=str(question_id),
-                    # 注意：模型上 clinical_scenario 字段名与关系冲突，避免直接赋值
+                    clinical_scenario=clinical_query,
                     rag_question=clinical_query,
                     rag_answer=answer_text,
                     rag_contexts=contexts,
-                    rag_trace_data=rag_result.get("trace"),
+                    rag_trace_data=trace,
                     standard_answer=ground_truth,
-                    faithfulness_score=(ragas_scores.get("faithfulness") if ragas_scores else None),
-                    answer_relevancy_score=(ragas_scores.get("answer_relevancy") if ragas_scores else None),
-                    context_precision_score=(ragas_scores.get("context_precision") if ragas_scores else None),
-                    context_recall_score=(ragas_scores.get("context_recall") if ragas_scores else None),
+                    faithfulness_score=ragas_scores.get("faithfulness", 0.0),
+                    answer_relevancy_score=ragas_scores.get("answer_relevancy", 0.0),
+                    context_precision_score=ragas_scores.get("context_precision", 0.0),
+                    context_recall_score=ragas_scores.get("context_recall", 0.0),
                     overall_score=overall_score,
                     evaluation_metadata={
-                        "clinical_scenario_text": clinical_query,
                         "rag_result": rag_result,
                         "contexts": contexts,
                         "model_name": model_name,
+                        "ragas_llm_model": getattr(ragas_evaluator, "llm_model_name", None),
+                        "ragas_embedding_model": getattr(ragas_evaluator, "embedding_model_name", None),
                     },
                     status="completed",
                     processing_stage="evaluation",
@@ -438,26 +388,16 @@ async def run_real_rag_evaluation(
                 db.add(sr)
 
             # 收集结果（返回给调用方/前端）
-            try:
-                llm_recs = (rag_result or {}).get("llm_recommendations")
-                if not llm_recs:
-                    tr = (rag_result or {}).get("trace") or {}
-                    llm_recs = tr.get("llm_parsed")
-            except Exception:
-                llm_recs = None
-
-            evaluation_results.append({
-                "question_id": question_id,
-                "clinical_query": clinical_query,
-                "rag_answer": answer_text,
-                "ground_truth": ground_truth,
-                "ragas_scores": ragas_scores,
-                "score_source": score_source,
-                "contexts": contexts,
-                "llm_recommendations": llm_recs,
-                "trace": (rag_result or {}).get("trace"),
-                "timestamp": (evaluation_completed_at.timestamp() if evaluation_completed_at else datetime.now().timestamp()),
-            })
+            evaluation_results.append(
+                {
+                    "question_id": question_id,
+                    "clinical_query": clinical_query,
+                    "rag_answer": answer_text,
+                    "ground_truth": ground_truth,
+                    "ragas_scores": ragas_scores,
+                    "contexts": contexts,
+                }
+            )
 
             completed_cases += 1
 
@@ -542,29 +482,6 @@ async def run_real_rag_evaluation(
                 except Exception as e:
                     logger.warning(f"保存指标历史失败: {e}")
 
-    # 保存结果到文件并返回文件名
-    try:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_task_id = task_id or "adhoc"
-        output_filename = f"ragas_results_{safe_task_id}_{ts_str}.json"
-        output_path = str((UPLOAD_DIR / output_filename).resolve())
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                "results": evaluation_results,
-                "summary": summary,
-                "total_cases": total_cases,
-                "completed_cases": completed_cases,
-                "failed_cases": failed_cases,
-                "model_name": model_name,
-                "embedding_model": embedding_model,
-                "base_url": base_url,
-            }, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.warning(f"export file saving failed: {e}")
-        output_filename = None
-        output_path = None
-
     return {
         "status": "success",
         "results": evaluation_results,
@@ -572,6 +489,4 @@ async def run_real_rag_evaluation(
         "total_cases": total_cases,
         "completed_cases": completed_cases,
         "failed_cases": failed_cases,
-        "output_file": output_filename,
-        "output_path": output_path,
     }

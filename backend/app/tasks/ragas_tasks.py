@@ -181,13 +181,9 @@ def process_batch_evaluation(self, task_id: str, scenarios: List[Dict[str, Any]]
 
             model_name = None
             base_url = None
-            embedding_model = None
-            data_count = None
             if task.evaluation_config and isinstance(task.evaluation_config, dict):
                 model_name = task.evaluation_config.get("model_name")
                 base_url = task.evaluation_config.get("base_url")
-                embedding_model = task.evaluation_config.get("embedding_model")
-                data_count = task.evaluation_config.get("data_count")
 
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
@@ -203,9 +199,6 @@ def process_batch_evaluation(self, task_id: str, scenarios: List[Dict[str, Any]]
                     "ground_truth": s.get("ground_truth") or s.get("standard_answer") or "",
                     "metadata": s.get("metadata") or {}
                 })
-            # 按 data_count 限制数量（>0 生效）
-            if data_count and isinstance(data_count, int) and data_count > 0:
-                test_cases = test_cases[:data_count]
 
             start_ts = _time.time()
 
@@ -213,8 +206,6 @@ def process_batch_evaluation(self, task_id: str, scenarios: List[Dict[str, Any]]
                 test_cases=test_cases,
                 model_name=model_name or "unknown",
                 base_url=base_url,
-                embedding_model=embedding_model,
-                data_count=data_count,
                 task_id=task_id,
                 db=db
             ))
@@ -254,9 +245,7 @@ def process_batch_evaluation(self, task_id: str, scenarios: List[Dict[str, Any]]
                 "completed_scenarios": result.get("completed_cases", 0),
                 "individual_results": result.get("results", []),
                 "summary_statistics": result.get("summary"),
-                "status": result.get("status"),
-                "export_file": result.get("output_file"),
-                "export_path": result.get("output_path"),
+                "status": result.get("status")
             }
 
             self.update_state(

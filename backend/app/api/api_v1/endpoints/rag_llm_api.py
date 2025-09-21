@@ -20,7 +20,7 @@ class IntelligentRecommendationRequest(BaseModel):
     clinical_query: str = Field(..., description="临床查询描述", min_length=5, max_length=500)
     include_raw_data: Optional[bool] = Field(False, description="是否包含原始数据")
     debug_mode: Optional[bool] = Field(False, description="是否开启调试模式")
-    
+
     # 新增可配置参数
     top_scenarios: Optional[int] = Field(None, description="显示的场景数量 (1-10)", ge=1, le=10)
     top_recommendations_per_scenario: Optional[int] = Field(None, description="每个场景的推荐数量 (1-10)", ge=1, le=10)
@@ -66,14 +66,14 @@ class RulesPacksRequest(BaseModel):
 class RulesPacksResponse(BaseModel):
     content: Dict[str, Any]
 
-@router.post("/intelligent-recommendation", 
+@router.post("/intelligent-recommendation",
              response_model=IntelligentRecommendationResponse,
              summary="RAG+LLM智能推荐",
              description="基于向量语义搜索和大语言模型的智能医疗检查推荐")
 async def get_intelligent_recommendation(request: IntelligentRecommendationRequest):
     """
     RAG+LLM智能推荐接口
-    
+
     工作流程：
     1. 用临床场景表进行语义搜索 (Top 3)
     2. 获取对应的高评分检查推荐 (评分≥7)
@@ -82,7 +82,7 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
     """
     try:
         logger.info(f"收到智能推荐请求: {request.clinical_query}")
-        
+
         # 调用RAG+LLM服务（支持可配置参数）
         result = rag_llm_service.generate_intelligent_recommendation(
             query=request.clinical_query,
@@ -95,7 +95,7 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
             compute_ragas=request.compute_ragas,
             ground_truth=request.ground_truth
         )
-        
+
         # 根据请求参数决定返回内容
         response_data = {
             "success": result["success"],
@@ -109,14 +109,14 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
             "max_similarity": result.get("max_similarity"),
             "is_low_similarity_mode": result.get("is_low_similarity_mode")
         }
-        
+
         if result["success"]:
             if request.include_raw_data:
                 response_data.update({
                     "scenarios": result.get("scenarios"),
                     "scenarios_with_recommendations": result.get("scenarios_with_recommendations")
                 })
-            
+
             if request.debug_mode:
                 response_data.update({
                     "llm_raw_response": result.get("llm_raw_response"),
@@ -126,9 +126,9 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
                 })
         else:
             response_data["message"] = result.get("message", "推荐生成失败")
-        
+
         return IntelligentRecommendationResponse(**response_data)
-        
+
     except Exception as e:
         logger.error(f"智能推荐API错误: {e}")
         raise HTTPException(status_code=500, detail=f"智能推荐服务异常: {str(e)}")
@@ -203,7 +203,7 @@ async def set_rules_packs(req: RulesPacksRequest) -> RulesPacksResponse:
         raise HTTPException(status_code=500, detail=f"写入/重载规则包失败: {e}")
 
 @router.get("/intelligent-recommendation-simple",
-           summary="简单智能推荐接口", 
+           summary="简单智能推荐接口",
            description="通过URL参数进行快速智能推荐")
 async def get_intelligent_recommendation_simple(
     query: str = Query(..., description="临床查询", min_length=5, max_length=500),
@@ -218,7 +218,7 @@ async def get_intelligent_recommendation_simple(
     """简化的智能推荐接口，适合快速测试"""
     try:
         request = IntelligentRecommendationRequest(
-            clinical_query=query, 
+            clinical_query=query,
             include_raw_data=include_raw,
             debug_mode=debug,
             top_scenarios=top_scenarios,
@@ -227,7 +227,7 @@ async def get_intelligent_recommendation_simple(
             similarity_threshold=threshold
         )
         return await get_intelligent_recommendation(request)
-        
+
     except Exception as e:
         logger.error(f"简单智能推荐API错误: {e}")
         raise HTTPException(status_code=500, detail=f"推荐服务异常: {str(e)}")
@@ -272,3 +272,103 @@ async def check_rag_llm_status():
             "error": str(e),
             "service_type": "RAG+LLM Intelligent Recommendation"
         }
+
+
+# —— 运行日志（服务端持久化） ——
+from datetime import datetime
+from typing import List
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal
+from app.models.system_models import InferenceLog
+
+class RunLogCreate(BaseModel):
+    query_text: str
+    result: Dict[str, Any]
+    inference_method: Optional[str] = Field('rag', description='rag | rule_based | case_voting')
+    success: Optional[bool] = True
+    error_message: Optional[str] = None
+    execution_time_ms: Optional[int] = None
+
+class RunLogItem(BaseModel):
+    id: int
+    query_text: str
+    success: bool
+    inference_method: Optional[str] = None
+    execution_time_ms: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+class RunLogList(BaseModel):
+    total: int
+    items: List[RunLogItem]
+
+@router.post('/runs/log', summary='保存本次运行结果到服务端', response_model=Dict[str, Any])
+async def create_run_log(payload: RunLogCreate):
+    db: Session = SessionLocal()
+    try:
+        exec_seconds = (payload.execution_time_ms or 0) / 1000.0
+        row = InferenceLog(
+            user_id=None,
+            query_text=payload.query_text,
+            inference_method=payload.inference_method or 'rag',
+            result=payload.result,
+            confidence_score=None,
+            success=bool(payload.success),
+            error_message=payload.error_message,
+            execution_time=exec_seconds,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return {'ok': True, 'id': row.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f'保存运行日志失败: {e}')
+    finally:
+        db.close()
+
+@router.get('/runs', summary='运行历史列表', response_model=RunLogList)
+async def list_run_logs(page: int = 1, page_size: int = 20):
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    db: Session = SessionLocal()
+    try:
+        q = db.query(InferenceLog)
+        total = q.count()
+        rows = q.order_by(InferenceLog.created_at.desc(), InferenceLog.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+        items = [RunLogItem(
+            id=r.id,
+            query_text=r.query_text,
+            success=bool(r.success),
+            inference_method=r.inference_method,
+            execution_time_ms=int((r.execution_time or 0.0) * 1000),
+            created_at=r.created_at,
+        ) for r in rows]
+        return RunLogList(total=total, items=items)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'查询运行历史失败: {e}')
+    finally:
+        db.close()
+
+@router.get('/runs/{log_id}', summary='运行详细', response_model=Dict[str, Any])
+async def get_run_log_detail(log_id: int):
+    db: Session = SessionLocal()
+    try:
+        r = db.query(InferenceLog).filter(InferenceLog.id == log_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail='未找到运行记录')
+        return {
+            'id': r.id,
+            'query_text': r.query_text,
+            'success': bool(r.success),
+            'inference_method': r.inference_method,
+            'execution_time_ms': int((r.execution_time or 0.0) * 1000),
+            'created_at': r.created_at,
+            'result': r.result,
+            'error_message': r.error_message,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'获取运行详情失败: {e}')
+    finally:
+        db.close()

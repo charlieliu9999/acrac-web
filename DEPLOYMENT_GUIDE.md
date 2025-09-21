@@ -11,14 +11,11 @@
 
 ## 快速启动
 
-### 1. 一键启动（推荐）
+### 1. 自动化启动（推荐）
 
 ```bash
-# 启动所有服务（前端、后端、Nginx、Postgres、Redis）
+# 启动所有服务
 ./start.sh
-
-# 查看服务状态
-docker-compose ps
 
 # 停止所有服务
 ./stop.sh
@@ -27,31 +24,7 @@ docker-compose ps
 ./restart.sh
 ```
 
-启动完成后：
-- 前端入口（经 Nginx）：http://localhost:5173
-- 后端 API（直连容器端口）：http://localhost:8001
-
-验证（可选）：
-```bash
-# 前端入口应返回 200/HTML
-curl -I http://127.0.0.1:5173 | head -n 5
-
-# 健康检查（经前端域名转发到后端）
-curl -sS http://127.0.0.1:5173/api/v1/acrac/health | jq .
-
-# 数据浏览接口示例
-curl -sS http://127.0.0.1:5173/api/v1/acrac/data/panels | head -c 200
-curl -sS "http://127.0.0.1:5173/api/v1/acrac/data/topics/by-panel?panel_id=P0001" | head -c 200
-curl -sS "http://127.0.0.1:5173/api/v1/acrac/data/scenarios/by-topic?topic_id=T0001" | head -c 200
-```
-
-注意：
-- 前端开发服务器（Vite）已容器化运行，由 Nginx 在 5173 端口对外提供服务。
-- 前端与后端走同域转发（/api → backend），无需设置 `VITE_API_BASE` 环境变量。
-- 如遇 502（Bad Gateway），先执行 `docker-compose logs nginx` 查看上游是否连到 `frontend:5173`，然后 `docker-compose restart nginx`。
-- 如遇“加载科室失败: Not Found”，通常是请求路径被拼成 `/api/api/v1/...`，请确认 axios `baseURL` 为空或未重复添加 `/api` 前缀（本项目已在 compose 中移除该环境变量）。
-
-### 2. 手动启动（可选）
+### 2. 手动启动
 
 #### 启动数据库服务
 ```bash
@@ -65,12 +38,12 @@ source venv/bin/activate
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-#### 启动前端服务（本机直跑）
+#### 启动前端服务
 ```bash
 cd frontend
-npm install
-npm run dev -- --host --port 5173
+npm run dev
 ```
+
 ## 服务访问地址
 
 - **前端应用**: http://localhost:5173

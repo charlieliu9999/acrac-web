@@ -8,6 +8,7 @@ import Tools from './pages/Tools'
 import DataImport from './pages/DataImport'
 import ModelConfig from './pages/ModelConfig'
 import RAGEvaluation from './pages/RAGEvaluation'
+import RunLogs from './pages/RunLogs'
 import { api } from './api/http'
 
 const { Header, Content, Sider, Footer } = Layout
@@ -31,6 +32,7 @@ function App() {
     if (location.pathname.startsWith('/import')) return 'import'
     if (location.pathname.startsWith('/models')) return 'models'
     if (location.pathname.startsWith('/evaluation')) return 'evaluation'
+    if (location.pathname.startsWith('/runs')) return 'runs'
     return 'assistant'
   }, [location.pathname])
 
@@ -114,6 +116,7 @@ function App() {
             if (e.key === 'import') navigate('/import')
             if (e.key === 'models') navigate('/models')
             if (e.key === 'evaluation') navigate('/evaluation')
+            if (e.key === 'runs') navigate('/runs')
           }}
           items={[
             { key: 'assistant', label: 'RAG 助手' },
@@ -123,6 +126,7 @@ function App() {
             { key: 'tools', label: '工具箱' },
             { key: 'import', label: '数据导入' },
             { key: 'models', label: '模型配置' },
+            { key: 'runs', label: '历史记录' },
           ]}
         />
       </Sider>
@@ -147,6 +151,7 @@ function App() {
               <Route path="/tools" element={<Tools />} />
               <Route path="/import" element={<DataImport />} />
               <Route path="/models" element={<ModelConfig />} />
+              <Route path="/runs" element={<RunLogs />} />
             </Routes>
           </div>
         </Content>

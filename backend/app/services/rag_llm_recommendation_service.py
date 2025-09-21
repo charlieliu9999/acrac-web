@@ -35,6 +35,9 @@ except Exception:
     pass
 
 logger = logging.getLogger(__name__)
+# 严格嵌入模式：默认开启。为兼容本地调试，可通过 STRICT_EMBEDDING=false 放宽为随机向量兜底（仅调试）。
+STRICT_EMBEDDING = (os.getenv("STRICT_EMBEDDING", "true").lower() in ("1", "true", "yes"))
+
 
 def embed_with_siliconflow(
     text: str,
@@ -47,7 +50,7 @@ def embed_with_siliconflow(
     支持：SiliconFlow、OpenAI、OpenRouter、Ollama（/v1/embeddings）。
     - 当 base_url 指向 Ollama（含 11434 或 'ollama'）时，不需要 API key。
     - 其余情况优先使用提供的 api_key 或环境变量（OPENAI_API_KEY / SILICONFLOW_API_KEY / OPENROUTER_API_KEY）。
-    失败时返回随机向量以不中断流程（但会记录告警）。
+    默认严格模式：请求失败将抛错并在源头暴露配置问题；仅当 STRICT_EMBEDDING=false 时才在本地调试返回随机向量。
     """
     try:
         endpoint = (base_url
@@ -70,12 +73,17 @@ def embed_with_siliconflow(
             raise ValueError("invalid embeddings response")
         return emb
     except Exception as e:
-        logger.warning(f"Embedding request failed ({base_url or 'default'}): {e}; using random vector")
+        endpoint_hint = (base_url or os.getenv("OPENAI_BASE_URL") or os.getenv("SILICONFLOW_BASE_URL") or os.getenv("OLLAMA_BASE_URL") or "unknown").rstrip("/")
+        logger.error(f"Embedding request failed ({endpoint_hint}): {e}")
+        if STRICT_EMBEDDING:
+            # 严格模式：在源头暴露错误，便于快速定位（不再悄悄兜底）
+            raise
+        logger.warning("STRICT_EMBEDDING=false → using random vector for debug only")
         return np.random.rand(1024).tolist()
 
 class RAGLLMRecommendationService:
     """增强RAG+LLM医疗检查推荐服务"""
-    
+
     def __init__(self):
         self.db_config = {
             'host': os.getenv('PGHOST', 'localhost'),
@@ -90,7 +98,7 @@ class RAGLLMRecommendationService:
             self.pgvector_probes = int(os.getenv('PGVECTOR_PROBES', '20'))
         except Exception:
             self.pgvector_probes = 20
-        
+
         # 基础模型连接配置
         self.api_key = os.getenv("SILICONFLOW_API_KEY") or getattr(settings, "SILICONFLOW_API_KEY", "")
         self.default_base_url = os.getenv("SILICONFLOW_BASE_URL") or getattr(settings, "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
@@ -135,7 +143,7 @@ class RAGLLMRecommendationService:
         self.topic_boost = float(os.getenv("RAG_TOPIC_BOOST", "0.20"))
         self.keyword_boost = float(os.getenv("RAG_KEYWORD_BOOST", "0.05"))
         self.rating_boost = float(os.getenv("RAG_RATING_BOOST", "0.03"))
-        
+
         # 提示词配置参数
         self.top_scenarios = int(os.getenv("RAG_TOP_SCENARIOS", "2"))
         self.top_recommendations_per_scenario = int(os.getenv("RAG_TOP_RECOMMENDATIONS_PER_SCENARIO", "3"))
@@ -145,6 +153,33 @@ class RAGLLMRecommendationService:
             self.rules_engine = load_engine()
         except Exception:
             self.rules_engine = None
+
+        # 监控模型上下文文件，便于多进程环境下的热更新（每次请求前做mtime检查）
+        self._contexts_path = Path(__file__).resolve().parents[2] / "config" / "model_contexts.json"
+        try:
+            self._contexts_mtime = self._contexts_path.stat().st_mtime
+        except Exception:
+            self._contexts_mtime = 0.0
+
+    def _maybe_reload_contexts(self) -> None:
+        """当检测到 model_contexts.json 发生变化时，重新加载并热更新关键参数。
+        解决多worker下 /models/reload 仅作用于单进程的问题。
+        """
+        try:
+            current_mtime = self._contexts_path.stat().st_mtime
+        except Exception:
+            current_mtime = 0.0
+        if current_mtime != getattr(self, "_contexts_mtime", 0.0):
+            self._load_model_contexts()
+            self._contexts_mtime = current_mtime
+            # 将默认推理上下文中的关键字段覆盖到运行时参数
+            prev_base = self.base_url
+            self.llm_model = self.default_inference_context.get("llm_model", self.llm_model)
+            self.embedding_model = self.default_inference_context.get("embedding_model", self.embedding_model)
+            self.reranker_model = self.default_inference_context.get("reranker_model", self.reranker_model)
+            self.base_url = self.default_inference_context.get("base_url", self.base_url)
+            if self.base_url.rstrip('/') != prev_base.rstrip('/'):
+                self.llm_client = openai.OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def _load_model_contexts(self) -> None:
         """加载模型上下文与场景覆盖配置"""
@@ -218,6 +253,11 @@ class RAGLLMRecommendationService:
         ctx.setdefault('embedding_model', self.embedding_model)
         ctx.setdefault('base_url', self.base_url)
         ctx.setdefault('reranker_model', self.reranker_model)
+        # 新增：推理参数（若模型上下文提供，则透传；否则由下游默认）
+        if 'temperature' not in ctx and self.default_inference_context.get('temperature') is not None:
+            ctx['temperature'] = self.default_inference_context.get('temperature')
+        if 'top_p' not in ctx and self.default_inference_context.get('top_p') is not None:
+            ctx['top_p'] = self.default_inference_context.get('top_p')
         return ctx
 
     def _extract_scope_info(self, scenarios: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
@@ -265,7 +305,7 @@ class RAGLLMRecommendationService:
         )
         logger.error(f"DB连接失败（host={host}, port={port}）：{last_err}; {hint}")
         raise last_err
-    
+
     def search_clinical_scenarios(self, conn, query_vector: List[float], top_k: int = 3) -> List[Dict]:
         """搜索最相关的临床场景"""
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -301,18 +341,18 @@ class RAGLLMRecommendationService:
             """
             cur.execute(sql)
             return [dict(row) for row in cur.fetchall()]
-    
+
     def get_scenario_with_recommendations(self, conn, scenario_ids: List[str]) -> List[Dict]:
         """获取场景及其相关的检查推荐（按场景组织）"""
         if not scenario_ids:
             return []
-        
+
         scenario_ids_str = "','".join(scenario_ids)
         scenario_ids_placeholders = "'" + scenario_ids_str + "'"
-        
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             sql = f"""
-                SELECT 
+                SELECT
                     cs.semantic_id as scenario_id,
                     cs.description_zh as scenario_description,
                     cs.patient_population,
@@ -354,7 +394,7 @@ class RAGLLMRecommendationService:
             """
             cur.execute(sql)
             results = [dict(row) for row in cur.fetchall()]
-        
+
         # 按场景组织数据
         scenarios_with_recs = {}
         for row in results:
@@ -376,7 +416,7 @@ class RAGLLMRecommendationService:
                     'topic_name': row['topic_name'],
                     'recommendations': []
                 }
-            
+
             if row['procedure_id']:  # 有推荐的情况
                 scenarios_with_recs[scenario_id]['recommendations'].append({
                     'procedure_name_zh': row['procedure_name_zh'],
@@ -395,19 +435,19 @@ class RAGLLMRecommendationService:
                     'special_considerations': row['special_considerations'],
                     'pregnancy_safety': row['pregnancy_safety']
                 })
-        
+
         return list(scenarios_with_recs.values())
-    
-    def prepare_llm_prompt(self, query: str, scenarios: List[Dict], scenarios_with_recs: List[Dict], is_low_similarity: bool = False, 
+
+    def prepare_llm_prompt(self, query: str, scenarios: List[Dict], scenarios_with_recs: List[Dict], is_low_similarity: bool = False,
                           top_scenarios: Optional[int] = None, top_recs_per_scenario: Optional[int] = None, show_reasoning: Optional[bool] = None,
                           candidates: Optional[List[Dict]] = None) -> str:
         """准备LLM推理提示词（按场景组织推荐）"""
-        
+
         # 使用传入参数或默认配置
         top_scenarios = top_scenarios if top_scenarios is not None else self.top_scenarios
         top_recs_per_scenario = top_recs_per_scenario if top_recs_per_scenario is not None else self.top_recommendations_per_scenario
         show_reasoning = show_reasoning if show_reasoning is not None else self.show_reasoning
-        
+
         # 生成候选清单文本（若提供）
         candidates_block = ""
         if candidates:
@@ -449,7 +489,7 @@ JSON中不允许出现尾随逗号
             "rank": 1,
             "procedure_name": "检查项目名称",
             "modality": "检查方式",
-            "appropriateness_rating": "评分/9",  
+            "appropriateness_rating": "评分/9",
             "recommendation_reason": "推荐理由",
             "clinical_considerations": "临床考虑"
         }},
@@ -489,14 +529,14 @@ JSON中不允许出现尾随逗号
 
 ### 推荐检查:
 """
-                
+
                 if scenario_data['recommendations']:
                     # 使用可配置的推荐数量
                     for j, rec in enumerate(scenario_data['recommendations'][:top_recs_per_scenario], 1):
                         rec_info = f"""
 {j}. **{rec['procedure_name_zh']}** ({rec['modality']})
    - 评分: {rec['appropriateness_rating']}/9 ({rec['appropriateness_category_zh']})"""
-                        
+
                         # 根据配置决定是否显示推荐理由
                         if show_reasoning and rec.get('reasoning_zh'):
                             reasoning = rec.get('reasoning_zh', 'N/A')
@@ -504,19 +544,19 @@ JSON中不允许出现尾随逗号
                             if len(reasoning) > 200:
                                 reasoning = reasoning[:200] + '...'
                             rec_info += f"\n   - 理由: {reasoning}"
-                        
+
                         rec_info += "\n\n"
                         scenario_info += rec_info
                 else:
                     scenario_info += "   该场景暂无高评分推荐。\n\n"
-                
+
                 scenarios_info += scenario_info
-            
+
             # 相似度信息（与配置的场景数量匹配）
             similarity_info = ""
             for i, scenario in enumerate(scenarios[:top_scenarios], 1):
                 similarity_info += f"   场景{i}: {scenario['similarity']:.3f}\n"
-            
+
             prompt = f"""
 你是放射科医生，根据临床场景推荐最合适的影像检查项目。你要遵循医学诊断规范和ACR-AC指南的相关规则进行合理推荐.
 
@@ -571,7 +611,7 @@ JSON中不允许出现尾随逗号
     "no_rag": false
 }}
 """
-        
+
         return prompt
 
     def search_procedure_candidates(self, conn, query_vector: List[float], top_k: int = 15) -> List[Dict]:
@@ -606,7 +646,7 @@ JSON中不允许出现尾随逗号
             for r in rows:
                 r['procedure_name_zh'] = r.get('name_zh')
             return rows
-    
+
     def call_llm(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
         """调用LLM进行推理（使用Qwen2.5-32B）"""
         try:
@@ -624,7 +664,15 @@ JSON中不允许出现尾随逗号
             if self.debug_mode:
                 logger.info(f"LLM调用模型: {model_name}")
                 logger.info(f"LLM提示词长度: {len(prompt)} 字符")
-            
+
+            # 读取推理参数（默认按你的要求：temperature 8 0~0.3，top_p 默认 0.7；不限制 max_tokens）
+            temperature = ctx.get('temperature')
+            if temperature is None:
+                temperature = 0.1
+            top_p = ctx.get('top_p')
+            if top_p is None:
+                top_p = 0.7
+
             response = client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -635,22 +683,22 @@ JSON中不允许出现尾随逗号
                     )},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,  # 降低随机性，提高一致性
-                max_tokens=3000
+                temperature=temperature,
+                top_p=top_p,
             )
-            
+
             result = response.choices[0].message.content
 
             if self.debug_mode:
                 logger.info(f"LLM原始响应长度: {len(result)} 字符")
                 logger.info(f"LLM原始响应: {result[:500]}...")  # 只显示前500字符
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             return self._fallback_response()
-    
+
     def _fallback_response(self) -> str:
         """LLM调用失败时的降级响应"""
         return """
@@ -668,7 +716,7 @@ JSON中不允许出现尾随逗号
     "summary": "系统暂时无法提供智能推荐，建议使用传统向量搜索功能"
 }
 """
-    
+
     def parse_llm_response(self, llm_response: str) -> Dict[str, Any]:
         """解析LLM响应"""
         try:
@@ -837,9 +885,9 @@ JSON中不允许出现尾随逗号
             except Exception as ee:
                 logger.warning(f"容错解析也失败: {ee}")
             return {"recommendations": [], "summary": f"解析LLM响应失败: {str(e)}"}
-    
-    def generate_intelligent_recommendation(self, query: str, top_scenarios: Optional[int] = None, 
-                                          top_recommendations_per_scenario: Optional[int] = None, 
+
+    def generate_intelligent_recommendation(self, query: str, top_scenarios: Optional[int] = None,
+                                          top_recommendations_per_scenario: Optional[int] = None,
                                           show_reasoning: Optional[bool] = None,
                                           similarity_threshold: Optional[float] = None,
                                           debug_flag: Optional[bool] = None,
@@ -848,10 +896,14 @@ JSON中不允许出现尾随逗号
         """生成智能推荐（主入口函数）"""
         start_time = time.time()
         debug_info = {}
-        
+        timings: Dict[str, int] = {"total_ms": 0}
+
+        # 检查模型上下文是否更新（多worker下每次请求自愈热更新）
+        self._maybe_reload_contexts()
+
         # 使用传入参数或默认配置
         current_threshold = similarity_threshold if similarity_threshold is not None else self.similarity_threshold
-        
+
         try:
             # 1. 生成查询向量
             logger.info(f"开始处理查询: {query}")
@@ -865,12 +917,14 @@ JSON中不允许出现尾随逗号
             context_embedding_model = active_context.get('embedding_model')
             context_reranker = active_context.get('reranker_model')
 
+            t_embed_start = time.time()
             query_vector = embed_with_siliconflow(
                 query,
                 api_key=self.api_key,
                 model=context_embedding_model,
                 base_url=context_base_url,
             )
+            timings["embedding_ms"] = int((time.time() - t_embed_start) * 1000)
             if do_debug:
                 debug_info["step_2_vector_generation"] = {
                     "vector_dimension": len(query_vector),
@@ -878,7 +932,7 @@ JSON中不允许出现尾随逗号
                     "embedding_model": context_embedding_model,
                     "base_url": context_base_url,
                 }
-            
+
             # 2. 连接数据库（失败则降级为无RAG模式）
             conn = None
             db_ok = True
@@ -889,13 +943,15 @@ JSON中不允许出现尾随逗号
                 logger.warning(f"数据库连接失败，将使用无RAG模式: {db_err}")
                 if self.debug_mode:
                     debug_info["db_connection_error"] = str(db_err)
-            
+
             # 3. 搜索相关临床场景（使用可配置的召回 Top K），若DB不可用则跳过
             logger.info("搜索相关临床场景...")
             recall_k = self.scene_recall_topk
             scenarios = []
             if db_ok and conn is not None:
+                t_search_start = time.time()
                 scenarios = self.search_clinical_scenarios(conn, query_vector, top_k=recall_k)
+                timings["search_ms"] = int((time.time() - t_search_start) * 1000)
                 scope_info = self._extract_scope_info(scenarios)
                 scoped_context = self._resolve_inference_context(scope_info)
                 if scoped_context != active_context:
@@ -920,6 +976,7 @@ JSON中不允许出现尾随逗号
                 # 面向 panel/topic/关键词 的软重排 + reranker（优先）
                 try:
                     target_panels, target_topics = self._infer_targets_from_query(query)
+                    t_rerank_start = time.time()
                     scenarios = self._rerank_scenarios(
                         query,
                         scenarios,
@@ -934,6 +991,7 @@ JSON中不允许出现尾随逗号
                     )
                 except Exception as re:
                     logger.warning(f"场景重排失败: {re}")
+                    t_rerank_start = time.time()  # 确保后续赋值存在
 
                 # 规则引擎：rerank阶段（启用时可加权/过滤），默认audit-only
                 try:
@@ -948,7 +1006,9 @@ JSON中不允许出现尾随逗号
                             debug_info.setdefault('rules_audit', {})['rerank'] = rr_res.get('audit_logs') or []
                 except Exception as re:
                     logger.warning(f"规则引擎(rerank)执行失败: {re}")
-            
+                finally:
+                    timings["rerank_ms"] = int((time.time() - t_rerank_start) * 1000)
+
             if do_debug:
                 debug_info["step_3_scenarios_search"] = {
                     "found_scenarios": len(scenarios),
@@ -971,7 +1031,7 @@ JSON中不允许出现尾随逗号
                     }
                 except Exception:
                     pass
-            
+
             if db_ok and not scenarios:
                 return {
                     "success": False,
@@ -980,11 +1040,11 @@ JSON中不允许出现尾随逗号
                     "scenarios": [],
                     "debug_info": debug_info if self.debug_mode else None
                 }
-            
+
             # 4. 检查相似度阈值（使用可配置阈值）
             max_similarity = max((s.get("similarity", 0.0) for s in scenarios), default=0.0)
             is_low_similarity = (not db_ok) or (max_similarity < current_threshold)
-            
+
             if do_debug:
                 debug_info["step_4_similarity_check"] = {
                     "max_similarity": max_similarity,
@@ -992,12 +1052,12 @@ JSON中不允许出现尾随逗号
                     "is_low_similarity": is_low_similarity,
                     "similarity_status": "low" if is_low_similarity else "high"
                 }
-            
+
             # 5. 根据相似度决定处理方式
             if is_low_similarity:
                 # 低相似度：无RAG模式
                 logger.info(f"最高相似度 {max_similarity:.3f} 低于阈值 {current_threshold}，使用无RAG模式")
-                
+
                 # 候选检查（procedure_dictionary向量检索，半RAG）
                 candidates = []
                 if db_ok and conn is not None:
@@ -1005,6 +1065,7 @@ JSON中不允许出现尾随逗号
                         candidates = self.search_procedure_candidates(conn, query_vector, top_k=self.procedure_candidate_topk)
                     except Exception as ce:
                         logger.warning(f"候选检查检索失败: {ce}")
+                t_prompt_start = time.time()
                 prompt = self.prepare_llm_prompt(
                     query, scenarios, [], is_low_similarity=True,
                     top_scenarios=top_scenarios,
@@ -1012,8 +1073,9 @@ JSON中不允许出现尾随逗号
                     show_reasoning=show_reasoning,
                     candidates=candidates
                 )
+                timings["prompt_build_ms"] = int((time.time() - t_prompt_start) * 1000)
                 scenarios_with_recs = []
-                
+
                 if do_debug:
                     debug_info["step_5_mode"] = "no_rag"
                     debug_info["step_6_prompt_length"] = len(prompt)
@@ -1032,7 +1094,7 @@ JSON中不允许出现尾随逗号
             else:
                 # 高相似度：RAG模式
                 logger.info(f"最高相似度 {max_similarity:.3f} 高于阈值 {current_threshold}，使用RAG模式")
-                
+
                 # 获取场景及其推荐（复用召回时已取的，若无则再取）
                 scenario_ids = [s['semantic_id'] for s in scenarios]
                 try:
@@ -1051,6 +1113,7 @@ JSON中不允许出现尾随逗号
                             'procedure_name_zh': rec.get('procedure_name_zh'),
                             'modality': rec.get('modality')
                         })
+                t_prompt_start = time.time()
                 prompt = self.prepare_llm_prompt(
                     query, scenarios, scenarios_with_recs, is_low_similarity=False,
                     top_scenarios=top_scenarios,
@@ -1058,7 +1121,8 @@ JSON中不允许出现尾随逗号
                     show_reasoning=show_reasoning,
                     candidates=candidates
                 )
-                
+                timings["prompt_build_ms"] = int((time.time() - t_prompt_start) * 1000)
+
                 if do_debug:
                     debug_info["step_5_mode"] = "rag"
                     debug_info["step_5_scenarios_with_recs"] = {
@@ -1084,13 +1148,17 @@ JSON中不允许出现尾随逗号
                     "base_url": context_base_url,
                 }
             logger.info("调用LLM进行推理...")
+            t_llm_start = time.time()
             llm_response = self.call_llm(prompt, context={
                 'llm_model': context_llm_model,
                 'base_url': context_base_url,
             })
+            timings["llm_infer_ms"] = int((time.time() - t_llm_start) * 1000)
 
             # 7. 解析LLM响应（若LLM不可用则回退到基于RAG候选的确定性结果）
+            t_parse_start = time.time()
             parsed_result = self.parse_llm_response(llm_response)
+            timings["parse_ms"] = int((time.time() - t_parse_start) * 1000)
             try:
                 def _looks_like_llm_down(res: dict) -> bool:
                     recs = (res or {}).get("recommendations") or []
@@ -1218,22 +1286,33 @@ JSON中不允许出现尾随逗号
                 # 可选RAGAS评估
                 if compute_ragas:
                     try:
+                        t_ragas_start = time.time()
                         ragas_scores = self._compute_ragas_scores(
                             user_input=query,
                             answer=self._format_answer_for_ragas(parsed_result),
                             contexts=contexts,
                             reference=ground_truth
                         )
+                        timings["ragas_ms"] = int((time.time() - t_ragas_start) * 1000)
                         trace["ragas_scores"] = ragas_scores
                     except Exception as e:
                         trace["ragas_error"] = str(e)
+                # 注入耗时与模型信息
+                timings["total_ms"] = processing_time
+                trace["timing"] = timings
+                trace["models"] = {
+                    "llm": context_llm_model,
+                    "embedding": context_embedding_model,
+                    "reranker": context_reranker,
+                    "base_url": context_base_url,
+                }
                 result["trace"] = trace
-            
+
             if do_debug:
                 logger.info(f"推荐生成完成，总耗时: {processing_time}ms")
                 logger.info(f"生成推荐数量: {len(parsed_result.get('recommendations', []))}")
             return result
-            
+
         except Exception as e:
             logger.error(f"生成智能推荐失败: {e}")
             return {
@@ -1305,20 +1384,21 @@ JSON中不允许出现尾随逗号
             # 尝试常规（进程内）评测
             import ragas
             from datasets import Dataset
-            from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+            # 使用 ragas 0.3.x 的指标导入方式（函数/可调用指标），避免旧版包装器
+            from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
             from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-            from ragas.llms import LangchainLLMWrapper
-            from ragas.embeddings import LangchainEmbeddingsWrapper
 
-            api_key = os.getenv("SILICONFLOW_API_KEY")
-            base_url = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
-            llm_model = os.getenv("SILICONFLOW_LLM_MODEL", self.llm_model)
-            emb_model = os.getenv("SILICONFLOW_EMBEDDING_MODEL", "BAAI/bge-m3")
+            # 使用“评测上下文”中的模型与参数，避免与推理模型混淆
+            eval_ctx = dict(self.default_evaluation_context or {})
+            api_key = os.getenv("SILICONFLOW_API_KEY") or os.getenv("OPENAI_API_KEY")
+            base_url = eval_ctx.get("base_url") or os.getenv("SILICONFLOW_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.siliconflow.cn/v1"
+            llm_model = eval_ctx.get("llm_model") or os.getenv("SILICONFLOW_LLM_MODEL", self.llm_model)
+            emb_model = eval_ctx.get("embedding_model") or os.getenv("SILICONFLOW_EMBEDDING_MODEL", "BAAI/bge-m3")
+            temperature = eval_ctx.get("temperature", 0.1)
+            top_p = eval_ctx.get("top_p", 0.7)
 
-            llm = ChatOpenAI(model=llm_model, api_key=api_key, base_url=base_url, temperature=0)
+            llm = ChatOpenAI(model=llm_model, api_key=api_key, base_url=base_url, temperature=temperature, top_p=top_p)
             emb = OpenAIEmbeddings(model=emb_model, api_key=api_key, base_url=base_url)
-            w_llm = LangchainLLMWrapper(llm)
-            w_emb = LangchainEmbeddingsWrapper(emb)
 
             has_ref = bool(reference and str(reference).strip())
             if has_ref:
@@ -1329,10 +1409,10 @@ JSON中不允许出现尾随逗号
                     "ground_truth": [reference],
                 }
                 metrics = [
-                    Faithfulness(llm=w_llm),
-                    AnswerRelevancy(llm=w_llm, embeddings=w_emb),
-                    ContextPrecision(llm=w_llm),
-                    ContextRecall(llm=w_llm),
+                    faithfulness,
+                    answer_relevancy,
+                    context_precision,
+                    context_recall,
                 ]
             else:
                 # 未提供ground_truth时，计算不依赖参考答案的指标
@@ -1342,14 +1422,16 @@ JSON中不允许出现尾随逗号
                     "contexts": [contexts],
                 }
                 metrics = [
-                    Faithfulness(llm=w_llm),
-                    AnswerRelevancy(llm=w_llm, embeddings=w_emb),
+                    faithfulness,
+                    answer_relevancy,
                 ]
 
             data = Dataset.from_dict(data_dict)
             res = ragas.evaluate(
-                data,
+                dataset=data,
                 metrics=metrics,
+                llm=llm,
+                embeddings=emb,
             )
             # Normalize possible output formats
             if isinstance(res, dict):
@@ -1403,13 +1485,17 @@ JSON中不允许出现尾随逗号
         import subprocess as _subprocess
         import sys as _sys
 
+        # 使用“评测上下文”模型，避免误用推理模型
+        eval_ctx = dict(self.default_evaluation_context or {})
         payload = {
             "user_input": user_input,
             "answer": answer,
             "contexts": contexts,
             "reference": reference,
-            # 将默认模型也传给子进程以保证一致性
-            "llm_model": os.getenv("SILICONFLOW_LLM_MODEL", self.llm_model),
+            # 将评测默认模型也传给子进程以保证一致性（子进程代码如需可读取）
+            "llm_model": eval_ctx.get("llm_model") or os.getenv("SILICONFLOW_LLM_MODEL", self.llm_model),
+            "embedding_model": eval_ctx.get("embedding_model") or os.getenv("SILICONFLOW_EMBEDDING_MODEL", self.embedding_model),
+            "base_url": eval_ctx.get("base_url", self.base_url),
         }
         code = r"""
 import os, json, asyncio
@@ -1427,10 +1513,8 @@ reference = cfg.get('reference')
 
 import ragas
 from datasets import Dataset
-from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
+from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from ragas.llms import LangchainLLMWrapper
-from ragas.embeddings import LangchainEmbeddingsWrapper
 
 api_key = os.getenv('SILICONFLOW_API_KEY')
 base_url = os.getenv('SILICONFLOW_BASE_URL', 'https://api.siliconflow.cn/v1')
@@ -1439,8 +1523,6 @@ emb_model = os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
 
 llm = ChatOpenAI(model=llm_model, api_key=api_key, base_url=base_url, temperature=0)
 emb = OpenAIEmbeddings(model=emb_model, api_key=api_key, base_url=base_url)
-w_llm = LangchainLLMWrapper(llm)
-w_emb = LangchainEmbeddingsWrapper(emb)
 
 has_ref = bool(reference and str(reference).strip())
 if has_ref:
@@ -1451,10 +1533,10 @@ if has_ref:
         'ground_truth': [reference],
     }
     metrics = [
-        Faithfulness(llm=w_llm),
-        AnswerRelevancy(llm=w_llm, embeddings=w_emb),
-        ContextPrecision(llm=w_llm),
-        ContextRecall(llm=w_llm),
+        faithfulness,
+        answer_relevancy,
+        context_precision,
+        context_recall,
     ]
 else:
     data_dict = {
@@ -1463,14 +1545,16 @@ else:
         'contexts': [contexts],
     }
     metrics = [
-        Faithfulness(llm=w_llm),
-        AnswerRelevancy(llm=w_llm, embeddings=w_emb),
+        faithfulness,
+        answer_relevancy,
     ]
 
 data = Dataset.from_dict(data_dict)
 res = ragas.evaluate(
-    data,
+    dataset=data,
     metrics=metrics,
+    llm=llm,
+    embeddings=emb,
 )
 if isinstance(res, dict):
     base = res

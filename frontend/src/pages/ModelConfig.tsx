@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Card, Form, Input, Button, Space, message, Alert, Row, Col, Typography, Divider, Tabs, Select, Table, Popconfirm, Tag, Modal } from 'antd'
+import { Card, Form, Input, Button, Space, message, Alert, Row, Col, Typography, Divider, Tabs, Select, Table, Popconfirm, Tag, Modal, Badge, Tooltip, InputNumber, Switch } from 'antd'
+import { CheckCircleOutlined, ExclamationCircleOutlined, LoadingOutlined, SettingOutlined } from '@ant-design/icons'
 import { api } from '../api/http'
 import { API_BASE } from '../config'
 
-const { Text } = Typography
+const { Text, Title } = Typography
 
 const ModelConfig: React.FC = () => {
   const [form] = Form.useForm()
@@ -22,6 +23,16 @@ const ModelConfig: React.FC = () => {
   const [editForm] = Form.useForm()
   const [editVisible, setEditVisible] = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  
+  // 新增状态管理
+  const [activeProvider, setActiveProvider] = useState<string>('siliconflow')
+  const [providerConfigs, setProviderConfigs] = useState<any>({
+    ollama: { enabled: false, base_url: 'http://localhost:11434/v1' },
+    siliconflow: { enabled: true, base_url: 'https://api.siliconflow.cn/v1' },
+    qwen: { enabled: false, base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+    openai: { enabled: false, base_url: 'https://api.openai.com/v1' }
+  })
+  const [systemStatus, setSystemStatus] = useState<any>(null)
 
   const inferenceCtx = useMemo(() => contexts?.inference || {}, [contexts])
   const evaluationCtx = useMemo(() => contexts?.evaluation || {}, [contexts])
@@ -76,6 +87,12 @@ const ModelConfig: React.FC = () => {
       setConfig(r.data)
       setContexts(r.data.contexts || { inference: {}, evaluation: {} })
       setOverrides(r.data.scenario_overrides || [])
+      
+      // 加载提供商配置
+      if (r.data.providers) {
+        setProviderConfigs(r.data.providers)
+      }
+      
       form.setFieldsValue({
         embedding_model: r.data.embedding_model,
         llm_model: r.data.llm_model,
@@ -84,6 +101,11 @@ const ModelConfig: React.FC = () => {
         rerank_provider: r.data.rerank_provider || 'auto',
         ragas_llm_model: r.data.ragas_defaults?.llm_model || '',
         ragas_embedding_model: r.data.ragas_defaults?.embedding_model || '',
+        // 新增：上下文推理参数
+        inf_temperature: (r.data.contexts?.inference?.temperature ?? null),
+        inf_top_p: (r.data.contexts?.inference?.top_p ?? null),
+        ev_temperature: (r.data.contexts?.evaluation?.temperature ?? null),
+        ev_top_p: (r.data.contexts?.evaluation?.top_p ?? null),
         siliconflow_api_key: '',
         openai_api_key: '',
       })
@@ -103,6 +125,38 @@ const ModelConfig: React.FC = () => {
     }
   }
 
+  // 新增：加载系统状态
+  const loadSystemStatus = async () => {
+    try {
+      const r = await api.get('/api/v1/admin/data/system/status')
+      setSystemStatus(r.data)
+    } catch (e: any) {
+      console.error('加载系统状态失败:', e)
+    }
+  }
+
+  // 新增：测试提供商连接
+  const testProviderConnection = async (provider: string, config: any) => {
+    try {
+      const r = await api.post('/api/v1/admin/data/models/test-provider', {
+        provider,
+        config
+      })
+      return r.data.success
+    } catch (e: any) {
+      message.error(`${provider} 连接测试失败: ${e?.response?.data?.detail || e.message}`)
+      return false
+    }
+  }
+
+  // 新增：更新提供商配置
+  const updateProviderConfig = (provider: string, config: any) => {
+    setProviderConfigs(prev => ({
+      ...prev,
+      [provider]: { ...prev[provider], ...config }
+    }))
+  }
+
   const refreshRegistry = async () => {
     try {
       setRegLoading(true)
@@ -116,15 +170,15 @@ const ModelConfig: React.FC = () => {
     }
   }
 
-  useEffect(() => { load() }, [])
-  // 自动自检：加载配置后，静默检查推理/评测上下文的连通性
-  useEffect(() => {
-    if (config) {
-      checkConnectivity('inference', true)
-      checkRagasConnectivity(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.llm_model, config?.embedding_model, config?.base_url])
+  useEffect(() => { 
+    load()
+    loadSystemStatus()
+    // 定期刷新系统状态
+    const interval = setInterval(loadSystemStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+  
+  // 取消页面自动联通测试：仅在“保存配置”或显式点击“连接测试”按钮时进行测试
 
   const save = async (v: any) => {
     setLoading(true)
@@ -151,6 +205,9 @@ const ModelConfig: React.FC = () => {
             embedding_model: v.embedding_model,
             reranker_model: v.reranker_model,
             base_url: v.base_url,
+            // 新增：推理参数
+            temperature: (v.inf_temperature ?? undefined),
+            top_p: (v.inf_top_p ?? undefined),
           },
           evaluation: {
             ...(contexts?.evaluation || {}),
@@ -158,6 +215,9 @@ const ModelConfig: React.FC = () => {
             embedding_model: v.ragas_embedding_model || (contexts?.evaluation?.embedding_model ?? ''),
             base_url: contexts?.evaluation?.base_url,
             reranker_model: contexts?.evaluation?.reranker_model,
+            // 新增：评测参数
+            temperature: (v.ev_temperature ?? undefined),
+            top_p: (v.ev_top_p ?? undefined),
           }
         },
         scenario_overrides: overrides || [],
@@ -236,9 +296,329 @@ const ModelConfig: React.FC = () => {
     )}
   ]
 
+  // 渲染系统状态卡片
+  const renderSystemStatus = () => (
+    <Card title="系统状态总览" style={{ marginBottom: 16 }}>
+      <Row gutter={16}>
+        <Col span={6}>
+          <div style={{ textAlign: 'center' }}>
+            <Badge 
+              status={systemStatus?.api?.status === 'ok' ? 'success' : 'error'} 
+              text="API服务" 
+            />
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              {systemStatus?.api?.version || 'Unknown'}
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div style={{ textAlign: 'center' }}>
+            <Badge 
+              status={systemStatus?.db?.status === 'ok' ? 'success' : 'error'} 
+              text="数据库" 
+            />
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              {systemStatus?.db?.vector_count || 0} 向量
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div style={{ textAlign: 'center' }}>
+            <Badge 
+              status={systemStatus?.embedding?.status === 'ok' ? 'success' : 'error'} 
+              text="向量模型" 
+            />
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              {systemStatus?.embedding?.dimension || 0}维
+            </div>
+          </div>
+        </Col>
+        <Col span={6}>
+          <div style={{ textAlign: 'center' }}>
+            <Badge 
+              status={systemStatus?.llm?.status === 'ok' ? 'success' : 'error'} 
+              text="LLM模型" 
+            />
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              {systemStatus?.llm?.model || 'Unknown'}
+            </div>
+          </div>
+        </Col>
+      </Row>
+    </Card>
+  )
+
+  // 渲染提供商选择标签页
+  const renderProviderTabs = () => {
+    const items = [
+      {
+        key: 'siliconflow',
+        label: (
+          <Space>
+            <Badge status={providerConfigs.siliconflow?.enabled ? 'success' : 'default'} />
+            SiliconFlow
+          </Space>
+        ),
+        children: renderProviderConfig('siliconflow')
+      },
+      {
+        key: 'ollama',
+        label: (
+          <Space>
+            <Badge status={providerConfigs.ollama?.enabled ? 'success' : 'default'} />
+            Ollama
+          </Space>
+        ),
+        children: renderProviderConfig('ollama')
+      },
+      {
+        key: 'qwen',
+        label: (
+          <Space>
+            <Badge status={providerConfigs.qwen?.enabled ? 'success' : 'default'} />
+            通义千问
+          </Space>
+        ),
+        children: renderProviderConfig('qwen')
+      },
+      {
+        key: 'openai',
+        label: (
+          <Space>
+            <Badge status={providerConfigs.openai?.enabled ? 'success' : 'default'} />
+            OpenAI
+          </Space>
+        ),
+        children: renderProviderConfig('openai')
+      }
+    ]
+
+    return (
+      <Card title="模型提供商配置" style={{ marginBottom: 16 }}>
+        <Tabs 
+          items={items} 
+          activeKey={activeProvider}
+          onChange={setActiveProvider}
+        />
+      </Card>
+    )
+  }
+
+  // 渲染单个提供商配置
+  const renderProviderConfig = (provider: string) => {
+    const config = providerConfigs[provider] || {}
+    
+    return (
+      <div>
+        <Alert
+          message={getProviderDescription(provider)}
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        
+        <Form
+          layout="vertical"
+          initialValues={config}
+          onValuesChange={(_, allValues) => updateProviderConfig(provider, allValues)}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="enabled" label="启用状态" valuePropName="checked">
+                <Switch 
+                  checkedChildren="启用" 
+                  unCheckedChildren="禁用"
+                  onChange={(checked) => updateProviderConfig(provider, { enabled: checked })}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Button 
+                onClick={() => testProviderConnection(provider, config)}
+                loading={checking}
+              >
+                测试连接
+              </Button>
+            </Col>
+          </Row>
+
+          {getProviderSpecificFields(provider)}
+          
+          <Divider orientation="left">模型配置</Divider>
+          
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="embedding_model" label="Embedding模型">
+                <Select
+                  placeholder="选择embedding模型"
+                  options={getEmbeddingModelOptions(provider)}
+                  showSearch
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="llm_model" label="LLM模型">
+                <Select
+                  placeholder="选择LLM模型"
+                  options={getLLMModelOptions(provider)}
+                  showSearch
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="rerank_model" label="Rerank模型">
+                <Select
+                  placeholder="选择rerank模型"
+                  options={getRerankModelOptions(provider)}
+                  showSearch
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {provider === 'ollama' && (
+            <Alert
+              message="向量维度配置"
+              description="Ollama支持不同维度的向量模型，请根据选择的embedding模型配置正确的维度"
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
+        </Form>
+      </div>
+    )
+  }
+
+  const getProviderDescription = (provider: string) => {
+    const descriptions = {
+      siliconflow: '硅基流动提供高性能的云端AI模型服务，支持多种开源大模型',
+      ollama: '本地部署的AI模型服务，支持Qwen3-4B等模型，可配置2560维向量',
+      qwen: '阿里云通义千问系列模型，提供强大的中文理解能力',
+      openai: 'OpenAI官方API服务，提供GPT系列模型'
+    }
+    return descriptions[provider as keyof typeof descriptions] || ''
+  }
+
+  const getProviderSpecificFields = (provider: string) => {
+    switch (provider) {
+      case 'ollama':
+        return (
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="base_url" label="服务地址">
+                <Input id="provider_base_url_primary" placeholder="http://localhost:11434/v1" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="embedding_dimension" label="向量维度">
+                <Select
+                  placeholder="选择向量维度"
+                  options={[
+                    { value: 1024, label: '1024维 (BGE-M3)' },
+                    { value: 2560, label: '2560维 (Qwen3-4B)' },
+                    { value: 1536, label: '1536维 (OpenAI)' },
+                    { value: 768, label: '768维 (BERT)' }
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        )
+      case 'siliconflow':
+      case 'qwen':
+      case 'openai':
+        return (
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="api_key" label="API Key" rules={[{ required: true }]}>
+                <Input.Password placeholder="输入API密钥" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="base_url" label="API地址">
+                <Input id="provider_base_url_secondary" />
+              </Form.Item>
+            </Col>
+          </Row>
+        )
+      default:
+        return null
+    }
+  }
+
+  const getEmbeddingModelOptions = (provider: string) => {
+    const options = {
+      ollama: [
+        { value: 'bge-m3:latest', label: 'BGE-M3 (1024维)' },
+        { value: 'qwen3:4b', label: 'Qwen3-4B (2560维)' },
+        { value: 'nomic-embed-text', label: 'Nomic Embed Text' }
+      ],
+      siliconflow: [
+        { value: 'BAAI/bge-m3', label: 'BGE-M3' },
+        { value: 'BAAI/bge-large-zh-v1.5', label: 'BGE-Large-ZH' }
+      ],
+      qwen: [
+        { value: 'text-embedding-v1', label: 'Text Embedding V1' },
+        { value: 'text-embedding-v2', label: 'Text Embedding V2' }
+      ],
+      openai: [
+        { value: 'text-embedding-3-large', label: 'Text Embedding 3 Large' },
+        { value: 'text-embedding-3-small', label: 'Text Embedding 3 Small' }
+      ]
+    }
+    return options[provider as keyof typeof options] || []
+  }
+
+  const getLLMModelOptions = (provider: string) => {
+    const options = {
+      ollama: [
+        { value: 'qwen3:30b', label: 'Qwen3-30B' },
+        { value: 'qwen3:4b', label: 'Qwen3-4B' },
+        { value: 'llama3:8b', label: 'Llama3-8B' }
+      ],
+      siliconflow: [
+        { value: 'Qwen/Qwen2.5-32B-Instruct', label: 'Qwen2.5-32B-Instruct' },
+        { value: 'Qwen/Qwen2.5-14B-Instruct', label: 'Qwen2.5-14B-Instruct' }
+      ],
+      qwen: [
+        { value: 'qwen-max', label: 'Qwen Max' },
+        { value: 'qwen-plus', label: 'Qwen Plus' }
+      ],
+      openai: [
+        { value: 'gpt-4o', label: 'GPT-4o' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' }
+      ]
+    }
+    return options[provider as keyof typeof options] || []
+  }
+
+  const getRerankModelOptions = (provider: string) => {
+    const options = {
+      ollama: [
+        { value: 'bge-reranker-v2-m3', label: 'BGE Reranker V2 M3' }
+      ],
+      siliconflow: [
+        { value: 'BAAI/bge-reranker-v2-m3', label: 'BGE Reranker V2 M3' }
+      ],
+      qwen: [
+        { value: 'gte-rerank', label: 'GTE Rerank' }
+      ],
+      openai: []
+    }
+    return options[provider as keyof typeof options] || []
+  }
+
   return (
     <div>
-      <div className='page-title'>模型配置</div>
+      <div className='page-title'>
+        <Title level={2}>
+          <SettingOutlined /> 模型配置管理
+        </Title>
+      </div>
       <Alert
         type='info'
         showIcon
@@ -560,6 +940,18 @@ const ModelConfig: React.FC = () => {
                       </Form.Item>
                     </Col>
                   </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name='inf_temperature' label='Temperature (0–0.3)'>
+                        <InputNumber min={0} max={0.3} step={0.05} style={{ width: '100%' }} placeholder='建议 0~0.3' />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name='inf_top_p' label='Top-p'>
+                        <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} placeholder='默认 0.7' />
+                      </Form.Item>
+                    </Col>
+                  </Row>
                   <Space>
                     <Button onClick={()=>checkConnectivity('inference')} loading={checking}>连接测试（推理）</Button>
                     <Text type='secondary'>当前：{contexts?.inference?.llm_model || '-'} | {contexts?.inference?.embedding_model || '-'}</Text>
@@ -604,6 +996,18 @@ const ModelConfig: React.FC = () => {
                           placeholder='选择已注册的 Embedding 模型'
                           options={buildOptions.embedding}
                         />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item name='ev_temperature' label='Temperature (0–0.3)'>
+                        <InputNumber min={0} max={0.3} step={0.05} style={{ width: '100%' }} placeholder='建议 0~0.3' />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item name='ev_top_p' label='Top-p'>
+                        <InputNumber min={0} max={1} step={0.05} style={{ width: '100%' }} placeholder='默认 0.7' />
                       </Form.Item>
                     </Col>
                   </Row>

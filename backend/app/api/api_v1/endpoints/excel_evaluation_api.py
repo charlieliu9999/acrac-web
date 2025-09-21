@@ -11,8 +11,9 @@ import pandas as pd
 import requests
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, Body
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import logging
 import asyncio
 from sqlalchemy.orm import Session
@@ -317,32 +318,35 @@ async def upload_excel_file(file: UploadFile = File(...), db: Session = Depends(
         logger.error(f"上传Excel文件失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class ExcelStartEvaluationRequest(BaseModel):
+    test_cases: List[Dict[str, Any]]
+    filename: Optional[str] = None
+
 @router.post("/start-evaluation")
 async def start_evaluation(
-    background_tasks: BackgroundTasks, 
-    test_cases: List[Dict[str, Any]], 
-    filename: str = None,
+    req: ExcelStartEvaluationRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """开始批量评测"""
+    """开始批量评测（兼容 body={ test_cases: [...], filename } 的请求体）"""
     global evaluation_status
-    
+
     if evaluation_status["is_running"]:
         raise HTTPException(status_code=400, detail="评测正在进行中，请等待完成")
-    
+
     # 生成任务ID
     task_id = str(uuid.uuid4())
-    
+
     # 创建服务实例
     service = ExcelEvaluationService(db=db)
-    
+
     # 在后台运行评测
-    background_tasks.add_task(service.run_batch_evaluation, test_cases, task_id, filename)
-    
+    background_tasks.add_task(service.run_batch_evaluation, req.test_cases, task_id, req.filename)
+
     return {
         "success": True,
-        "message": f"开始评测{len(test_cases)}个案例",
-        "total_cases": len(test_cases),
+        "message": f"开始评测{len(req.test_cases)}个案例",
+        "total_cases": len(req.test_cases),
         "task_id": task_id
     }
 

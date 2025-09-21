@@ -29,6 +29,26 @@
       "base_url": "http://host.docker.internal:11434/v1",
       "api_key": null,
       "api_key_env": "nokey"
+    },
+    {
+      "id": "ollama-llm-gpt-oss_20b",
+      "label": "ollama/gpt-oss:20b",
+      "provider": "ollama",
+      "kind": "llm",
+      "model": "gpt-oss:20b",
+      "base_url": "http://host.docker.internal:11434/v1",
+      "api_key": "nokey",
+      "api_key_env": "nokey"
+    },
+    {
+      "id": "siliconflow-llm-Qwen_Qwen2.5-7B-Instruct",
+      "label": "silicon-qwen2.5-7b",
+      "provider": "siliconflow",
+      "kind": "llm",
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "api_key": "",
+      "api_key_env": "sk-ybghruztazvtitpwrityokshmckxkwflviwpuvseqopmxfze"
     }
   ],
   "embeddings": [

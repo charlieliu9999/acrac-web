@@ -45,6 +45,9 @@ class ContextConfig(BaseModel):
     embedding_model: Optional[str] = None
     reranker_model: Optional[str] = None
     base_url: Optional[str] = None
+    # 新增：可配置推理超参（不强制）
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
 
 
 class ScenarioBinding(BaseModel):
@@ -152,39 +155,10 @@ async def system_status() -> Dict[str, Any]:
             'base_url': os.getenv('SILICONFLOW_BASE_URL') or '',
         }
 
-    # 构造模型条目进行连通性检查（复用 check_single_model 逻辑）
-    async def _check(kind: str, model: str, base: str, provider_hint: str = 'siliconflow'):
-        entry = ModelEntry(provider=provider_hint, kind=kind, model=model, base_url=base, api_key_env='SILICONFLOW_API_KEY')
-        # 提示：如果是ollama base，将provider固定为ollama
-        b = (base or '').lower()
-        if ('11434' in b) or ('ollama' in b):
-            entry.provider = 'ollama'
-        return await check_single_model(entry)
-
-    # Embedding
-    try:
-        if inf['embedding_model']:
-            status['embedding'] = await _check('embedding', inf['embedding_model'], inf['base_url'])
-        else:
-            status['embedding'] = { 'status': 'unknown' }
-    except Exception as e:
-        status['embedding'] = { 'status': 'error', 'error': str(e) }
-    # LLM
-    try:
-        if inf['llm_model']:
-            status['llm'] = await _check('llm', inf['llm_model'], inf['base_url'])
-        else:
-            status['llm'] = { 'status': 'unknown' }
-    except Exception as e:
-        status['llm'] = { 'status': 'error', 'error': str(e) }
-    # Reranker
-    try:
-        if inf['reranker_model']:
-            status['reranker'] = await _check('reranker', inf['reranker_model'], inf['base_url'])
-        else:
-            status['reranker'] = { 'status': 'unknown' }
-    except Exception as e:
-        status['reranker'] = { 'status': 'error', 'error': str(e) }
+    # 仅返回配置信息，不做外部连通性探测（避免阻塞）
+    status['embedding'] = { 'status': 'unknown' }
+    status['llm'] = { 'status': 'unknown' }
+    status['reranker'] = { 'status': 'unknown' }
 
     return status
 
@@ -238,9 +212,14 @@ async def upload_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         ts = time.strftime('%Y%m%d_%H%M%S')
         dest = UPLOAD_DIR / f'{ts}_{file.filename}'
+        #
+						#   streaming 
         with dest.open('wb') as f:
-            content = await file.read()
-            f.write(content)
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
         return { 'ok': True, 'path': str(dest) }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -363,32 +342,44 @@ async def get_models_config() -> Dict[str, Any]:
             return os.getenv('OLLAMA_BASE_URL') or os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
         return os.getenv('SILICONFLOW_BASE_URL') or settings.SILICONFLOW_BASE_URL
 
-    # Inference context
-    inf_llm = os.getenv('SILICONFLOW_LLM_MODEL', inference_defaults.get('llm_model', ''))
-    inf_emb = os.getenv('SILICONFLOW_EMBEDDING_MODEL', inference_defaults.get('embedding_model', ''))
-    inf_base = os.getenv('SILICONFLOW_BASE_URL', inference_defaults.get('base_url', _default_base_for_model(inf_llm)))
+    # Inference context（优先展示“已保存的上下文”，缺失时再回退到进程 env）
+    inf_llm = inference_defaults.get('llm_model') or os.getenv('SILICONFLOW_LLM_MODEL', '')
+    inf_emb = inference_defaults.get('embedding_model') or os.getenv('SILICONFLOW_EMBEDDING_MODEL', '')
+    # base_url 优先使用保存的；若未保存且推断为 Ollama 模型（含冒号），优先 OLLAMA_BASE_URL；否则回退 SiliconFlow
+    if inference_defaults.get('base_url'):
+        inf_base = inference_defaults['base_url']
+    else:
+        if inf_llm and ':' in str(inf_llm) and os.getenv('OLLAMA_BASE_URL'):
+            inf_base = os.getenv('OLLAMA_BASE_URL')
+        else:
+            inf_base = os.getenv('SILICONFLOW_BASE_URL') or _default_base_for_model(inf_llm)
     inference_ctx = {
         'llm_model': inf_llm,
         'embedding_model': inf_emb,
-        'reranker_model': os.getenv('RERANKER_MODEL', inference_defaults.get('reranker_model', 'BAAI/bge-reranker-v2-m3')),
+        'reranker_model': inference_defaults.get('reranker_model') or os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-v2-m3'),
         'base_url': inf_base,
+        'temperature': inference_defaults.get('temperature'),
+        'top_p': inference_defaults.get('top_p'),
     }
 
-    # Evaluation (RAGAS) context
-    eva_llm = os.getenv('RAGAS_DEFAULT_LLM_MODEL', evaluation_defaults.get('llm_model', inference_ctx['llm_model']))
-    eva_emb = os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL', evaluation_defaults.get('embedding_model', inference_ctx['embedding_model']))
-    # 若显式设置了 RAGAS_DEFAULT_BASE_URL 则使用；否则当 llm 形如 qwen2.5:32b 时优先 OLLAMA_BASE_URL
-    if os.getenv('RAGAS_DEFAULT_BASE_URL'):
+    # Evaluation (RAGAS) context（同样优先使用保存的上下文）
+    eva_llm = evaluation_defaults.get('llm_model') or os.getenv('RAGAS_DEFAULT_LLM_MODEL') or inference_ctx['llm_model']
+    eva_emb = evaluation_defaults.get('embedding_model') or os.getenv('RAGAS_DEFAULT_EMBEDDING_MODEL') or inference_ctx['embedding_model']
+    if evaluation_defaults.get('base_url'):
+        eva_base = evaluation_defaults['base_url']
+    elif os.getenv('RAGAS_DEFAULT_BASE_URL'):
         eva_base = os.getenv('RAGAS_DEFAULT_BASE_URL')
     elif eva_llm and ':' in str(eva_llm) and os.getenv('OLLAMA_BASE_URL'):
         eva_base = os.getenv('OLLAMA_BASE_URL')
     else:
-        eva_base = evaluation_defaults.get('base_url', _default_base_for_model(eva_llm))
+        eva_base = _default_base_for_model(eva_llm)
     evaluation_ctx = {
         'llm_model': eva_llm,
         'embedding_model': eva_emb,
-        'reranker_model': os.getenv('RAGAS_DEFAULT_RERANKER_MODEL', evaluation_defaults.get('reranker_model')),
+        'reranker_model': evaluation_defaults.get('reranker_model') or os.getenv('RAGAS_DEFAULT_RERANKER_MODEL'),
         'base_url': eva_base,
+        'temperature': evaluation_defaults.get('temperature'),
+        'top_p': evaluation_defaults.get('top_p'),
     }
 
     contexts: Dict[str, Any] = {}
@@ -604,6 +595,30 @@ def _save_contexts_payload(payload: Dict[str, Any]) -> None:
     _atomic_write(CONTEXTS_PATH, json.dumps(payload, ensure_ascii=False, indent=2))
 
 
+def _validate_base_url(url: str) -> None:
+    """严格校验 Provider base_url：
+    - 必须是 http/https
+    - 路径以 /v1 结尾（OpenAI 兼容规范）
+    - 基本连通性：GET <base_url>/models 返回 200/401/403 之一
+    校验失败直接抛 400，阻止保存无效配置。
+    """
+    from urllib.parse import urlparse
+    import requests
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.netloc:
+        raise HTTPException(status_code=400, detail="base_url 必须以 http/https 开头且为有效 URL")
+    if not p.path.rstrip('/').endswith('/v1'):
+        raise HTTPException(status_code=400, detail="base_url 必须包含 /v1 路径，如 https://api.siliconflow.cn/v1 或 http://localhost:11434/v1")
+    try:
+        resp = requests.get(url.rstrip('/') + '/models', timeout=5)
+        if resp.status_code not in (200, 401, 403):
+            raise HTTPException(status_code=400, detail=f"base_url 连接成功但不兼容（/models 返回 HTTP {resp.status_code}）")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"base_url 不可达：{e}")
+
+
 @router.post('/models/config', summary='更新模型配置（写入.env并设置当前进程env）')
 async def set_models_config(cfg: ModelsConfig) -> Dict[str, Any]:
     try:
@@ -632,6 +647,12 @@ async def set_models_config(cfg: ModelsConfig) -> Dict[str, Any]:
             eval_ctx['llm_model'] = cfg.ragas_llm_model
         if cfg.ragas_embedding_model is not None:
             eval_ctx['embedding_model'] = cfg.ragas_embedding_model
+
+        # 源头校验：若提供 base_url，保存前强制连通性检查
+        if inf_ctx.get('base_url'):
+            _validate_base_url(inf_ctx['base_url'])
+        if eval_ctx.get('base_url'):
+            _validate_base_url(eval_ctx['base_url'])
 
         contexts_to_store: Dict[str, Dict[str, Any]] = dict(incoming_contexts)
         if inf_ctx:

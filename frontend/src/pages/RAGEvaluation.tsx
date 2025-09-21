@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { Button, Card, Col, Form, InputNumber, Row, Select, Table, Progress, Tag, Typography, message, Space, Divider, Modal, Upload, Tabs, Badge, Statistic, Switch, Input } from 'antd'
+import { Button, Card, Col, Form, InputNumber, Row, Select, Table, Progress, Tag, Typography, message, Space, Divider, Modal, Upload, Tabs, Badge, Statistic } from 'antd'
 import { DownloadOutlined, PlayCircleOutlined, PauseCircleOutlined, ReloadOutlined, UploadOutlined, FileExcelOutlined, EyeOutlined, DatabaseOutlined, HistoryOutlined } from '@ant-design/icons'
 import { api } from '../api/http'
+// 简易格式化秒为 分:秒
+const formatSeconds = (s?: number) => {
+  if (s === undefined || s === null || isNaN(s as any)) return '-'
+  const m = Math.floor((s as number) / 60)
+  const ss = Math.round((s as number) % 60)
+  return `${m}分${ss}秒`
+}
+
 import type { UploadProps, UploadFile } from 'antd/es/upload/interface'
 
 const { Text, Title } = Typography
@@ -45,6 +53,7 @@ interface ExcelEvaluationStatus {
   current_case: string | null
   results: any[]
   error: string | null
+  runtime?: { elapsed_seconds?: number; eta_seconds?: number; throughput_cpm?: number }
 }
 
 const RAGEvaluation: React.FC = () => {
@@ -55,7 +64,12 @@ const RAGEvaluation: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [historyVisible, setHistoryVisible] = useState(false)
-  const [historyData, setHistoryData] = useState<EvaluationResult[]>([])
+  const [historyData, setHistoryData] = useState<any[]>([])
+  const [historyStats, setHistoryStats] = useState<any | null>(null)
+  const [historyDetailVisible, setHistoryDetailVisible] = useState(false)
+  const [historyDetailTask, setHistoryDetailTask] = useState<any | null>(null)
+  const [historyDetailResults, setHistoryDetailResults] = useState<any[]>([])
+
 
   // Excel相关状态
   const [activeTab, setActiveTab] = useState('database')
@@ -72,116 +86,35 @@ const RAGEvaluation: React.FC = () => {
   })
   const [excelStatusPolling, setExcelStatusPolling] = useState<number | null>(null)
 
+  // 选择评测数据量
+  const [selectedDataCount, setSelectedDataCount] = useState<number>(-1)
+  // 处理模式：异步(默认)/同步
+  const [ragasAsyncMode, setRagasAsyncMode] = useState<boolean>(true)
+
   // RAGAS评测状态
   const [ragasTaskId, setRagasTaskId] = useState<string | null>(null)
   const [ragasPolling, setRagasPolling] = useState<number | null>(null)
   const [ragasResults, setRagasResults] = useState<any[]>([])
-  const [outputFilename, setOutputFilename] = useState<string | null>(null)
-  const [selectedLLM, setSelectedLLM] = useState<string>('')
-  const [selectedEmbedding, setSelectedEmbedding] = useState<string | undefined>(undefined)
-  const [dataCount, setDataCount] = useState<number | undefined>(undefined)
-  // 新增：RAGAS进度（用于异步实时进度展示，及同步模式的占位进度）
-  const [ragasSyncInProgress, setRagasSyncInProgress] = useState<boolean>(false)
-  const [ragasSyncProgress, setRagasSyncProgress] = useState<number>(0)
-  const [ragasStatus, setRagasStatus] = useState<{progress?: number; completed_cases?: number; failed_cases?: number; total?: number; status?: string} | null>(null)
+  const [ragasCompleted, setRagasCompleted] = useState<boolean>(false)
 
-  // 合并RAGAS结果（优先同步ragasResults，其次Excel评测结果）
-  const getCombinedRagasItems = () => {
-    const items = (ragasResults && ragasResults.length > 0) ? ragasResults : (excelEvaluationStatus.results || [])
-    return Array.isArray(items) ? items.filter((it:any) => !!it && !!it.ragas_scores) : []
+  const [ragasSummary, setRagasSummary] = useState<any | null>(null)
+
+  // 中间过程查看器
+  const [traceViewerVisible, setTraceViewerVisible] = useState(false)
+  const [traceViewerData, setTraceViewerData] = useState<any>(null)
+  const openTraceViewer = (record: any) => {
+    const t = (record as any)?.trace ?? (record as any)?.trace_preview ?? null
+    setTraceViewerData(t || {})
+    setTraceViewerVisible(true)
   }
-
-  const metricValues = (key: 'faithfulness'|'answer_relevancy'|'context_precision'|'context_recall') => {
-    const items = getCombinedRagasItems()
-    return items.map((it:any) => Number(it?.ragas_scores?.[key] ?? 0)).filter((v:number) => Number.isFinite(v))
-  }
-
-  const metricAvg = (vals: number[]) => vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : 0
-
-  const renderTinyBars = (vals: number[]) => {
-    if (!vals || vals.length === 0) return <span style={{ color: '#999' }}>无数据</span>
-    const maxH = 60
-    return (
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: maxH }}>
-        {vals.slice(0, 40).map((v, idx) => (
-          <div key={idx} title={v.toFixed(3)} style={{ width: 6, height: Math.max(2, Math.round(v * maxH)), background: '#1677ff', borderRadius: 2 }} />
-        ))}
-      </div>
-    )
-  }
-
-  const downloadRagasResults = (format: 'json'|'excel') => {
-    const items = getCombinedRagasItems()
-    if (!items.length) {
-      message.warning('暂无可导出的RAGAS结果')
-      return
-    }
-    if (format === 'json') {
-      const dataStr = JSON.stringify(items, null, 2)
-      const blob = new Blob([dataStr], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ragas_results_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-      message.success('已导出 JSON')
-      return
-    }
-    // 简易Excel导出：使用CSV，Excel可直接打开
-    if (format === 'excel') {
-      const headers = ['question_id','clinical_query','ground_truth','faithfulness','answer_relevancy','context_precision','context_recall']
-      const rows = items.map((it:any) => [
-        it.question_id ?? '',
-        (it.clinical_query ?? '').toString().replace(/\n/g,' '),
-        (it.ground_truth ?? '').toString().replace(/\n/g,' '),
-        (it.ragas_scores?.faithfulness ?? 0),
-        (it.ragas_scores?.answer_relevancy ?? 0),
-        (it.ragas_scores?.context_precision ?? 0),
-        (it.ragas_scores?.context_recall ?? 0),
-      ])
-      const csv = [headers.join(','), ...rows.map(r => r.map(v => (typeof v === 'string' && (v.includes(',')||v.includes('"')))?`"${v.replace(/"/g,'""')}"`:v).join(','))].join('\n')
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ragas_results_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      message.success('已导出 Excel(CSV)')
-      return
-    }
-  }
-
-  const [ragasAsync, setRagasAsync] = useState<boolean>(true)
 
   // 模拟LLM模型选项
-  const [ragasLLMOptions, setRagasLLMOptions] = useState<{value:string,label:string,_entry?:any}[]>([])
-  const [ragasEmbOptions, setRagasEmbOptions] = useState<{value:string,label:string,_entry?:any}[]>([])
-  useEffect(() => {
-    (async ()=>{
-      try {
-        const reg = await api.get('/api/v1/admin/data/models/registry')
-        const data = reg.data || {}
-        setRagasLLMOptions((data.llms||[]).map((m:any)=>({ value: m.model, label: (m.label||m.model)+' · '+m.model, _entry: m })))
-        setRagasEmbOptions((data.embeddings||[]).map((m:any)=>({ value: m.model, label: (m.label||m.model)+' · '+m.model, _entry: m })))
-      } catch(e) {}
-      try {
-        const cfg = await api.get('/api/v1/admin/data/models/config')
-        const ragas = cfg.data?.ragas_defaults || {}
-        if (ragas.llm_model) setSelectedLLM(ragas.llm_model)
-        if (ragas.embedding_model) setSelectedEmbedding(ragas.embedding_model)
-      } catch(e) {}
-    })()
-  }, [])
-
-  // 移除“占位滚动条”模拟，避免误导；统一使用异步模式展示真实进度
-  useEffect(() => {
-    if (!ragasSyncInProgress) {
-      setRagasSyncProgress(0)
-    }
-  }, [ragasSyncInProgress])
-  const llmModels = ragasLLMOptions.length ? ragasLLMOptions : [ { value: 'Qwen/Qwen2.5-32B-Instruct', label: 'Qwen/Qwen2.5-32B-Instruct (SiliconFlow)' } ]
+  const llmModels = [
+    { value: 'gpt-4', label: 'GPT-4' },
+    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    { value: 'claude-3', label: 'Claude-3' },
+    { value: 'qwen-max', label: 'Qwen Max' },
+  ]
 
   const dataCountOptions = [
     { value: 5, label: '前5条数据' },
@@ -218,32 +151,22 @@ const RAGEvaluation: React.FC = () => {
 
          try {
            const startTime = Date.now()
-           // 调用后端 RAG+LLM 主接口，获取推荐与trace
-           const response = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', {
-             clinical_query: testCase.clinical_query,
-             include_raw_data: true,
-             debug_mode: true,
-             top_scenarios: 3,
-             top_recommendations_per_scenario: 3,
+           const response = await api.post('/api/v1/acrac/rag/query', {
+             query: testCase.clinical_query,
+             model: values.llm_model,
+             question_id: testCase.question_id
            })
 
            const endTime = Date.now()
            const responseTime = (endTime - startTime) / 1000
 
-           // 将推荐拼接为可读答案文本（用于预览/导出，不影响RAGAS流程）
-           const llm = response.data?.llm_recommendations || {}
-           const recs = Array.isArray(llm?.recommendations) ? llm.recommendations : []
-           const answerText = recs && recs.length
-             ? `推荐的影像学检查:\n` + recs.slice(0,3).map((r:any)=>`- ${r.procedure_name||r.name||r.recommendation||''} (${r.modality||''})`).join('\n')
-             : ''
-
            const result: EvaluationResult = {
              question_id: testCase.question_id,
              query: testCase.clinical_query,
              ground_truth: testCase.ground_truth,
-             answer: answerText,
+             answer: response.data.answer || '',
              response_time: responseTime,
-             trace: response.data.trace || response.data.debug_info || {},
+             trace: response.data.trace || {},
              timestamp: new Date().toISOString(),
              model: values.llm_model,
              source: 'excel',
@@ -370,24 +293,42 @@ const RAGEvaluation: React.FC = () => {
         }
       })
 
-      const items = response.data?.items || []
-      const historyResults: EvaluationResult[] = items.map((task: any) => ({
-        question_id: task.task_id,
-        query: task.task_name || '历史评测任务',
-        ground_truth: '',
-        answer: '',
-        response_time: 0,
-        trace: {},
-        timestamp: task.created_at,
-        model: task.model_name || 'unknown',
-        source: 'history',
-        ragas_scores: undefined as any,
-        status: (task.status || 'pending')
-      }))
+      const items = response.data?.items || response.data?.tasks || []
+      if (items && items.length > 0) {
+        // 历史任务列表数据
+        const tasks = items.map((t: any) => ({
+          task_id: t.task_id,
+          task_name: t.task_name,
+          model_name: t.model_name || 'unknown',
+          total_cases: t.total_cases,
+          status: t.status,
+          start_time: t.start_time || t.created_at,
+          end_time: t.end_time,
+          processing_time: t.processing_time,
+          created_at: t.created_at,
+        }))
 
-      setHistoryData(historyResults)
-      setHistoryVisible(true)
-      message.success(`成功加载 ${historyResults.length} 条历史记录`)
+        setHistoryData(tasks)
+        try {
+          const statResp = await api.get('/api/v1/ragas/history/statistics')
+          const s = statResp.data || {}
+          setHistoryStats({
+            total_tasks: s.total_tasks ?? 0,
+            status_distribution: s.status_distribution || {},
+            model_usage: s.model_usage || {},
+            recent_tasks: s.recent_tasks_7days ?? s.recent_tasks ?? 0,
+            avg_processing_time_min: s.average_processing_time_minutes ?? s.avg_processing_time_min ?? 0,
+          })
+        } catch (e) {
+          setHistoryStats(null)
+        }
+        setHistoryVisible(true)
+        message.success(`成功加载 ${items.length} 条历史记录`)
+      } else {
+        setHistoryData([])
+        setHistoryVisible(true)
+        message.info('暂无历史评测记录')
+      }
     } catch (error: any) {
       console.error('加载历史数据失败:', error)
       message.error('加载历史数据失败：' + (error.response?.data?.detail || error.message))
@@ -463,55 +404,21 @@ const RAGEvaluation: React.FC = () => {
   }
 
   // RAGAS评估函数
-  const runRAGASEvaluation = async (testCases: ExcelTestCase[], isAsync: boolean = true, params?: { model_name?: string; embedding_model?: string; data_count?: number }) => {
-    let sanitizedCases: { question_id: string; clinical_query: string; ground_truth: string }[] = []
+  const runRAGASEvaluation = async (testCases: ExcelTestCase[], isAsync: boolean = true) => {
     try {
       message.info('开始RAGAS评估...')
-      setRagasStatus(null)
-      setRagasSyncInProgress(!isAsync)
 
-      // 统一清洗/强制转为字符串，避免 Pydantic 提示“Input should be a valid string”
-      sanitizedCases = (testCases || []).map((tc: any) => ({
-        question_id: String(tc?.question_id ?? ''),
-        clinical_query: typeof tc?.clinical_query === 'string' ? tc.clinical_query : String(tc?.clinical_query ?? ''),
-        ground_truth: typeof tc?.ground_truth === 'string' ? tc.ground_truth : String(tc?.ground_truth ?? ''),
-      })).filter((tc) => tc.clinical_query.trim().length > 0 && tc.ground_truth.trim().length > 0)
-
-      if (sanitizedCases.length === 0) {
-        message.error('RAGAS评估失败：无有效用例（临床场景/标准答案为空）')
-        throw new Error('no valid cases')
-      }
-      if (sanitizedCases.length !== testCases.length) {
-        message.warning(`已过滤 ${testCases.length - sanitizedCases.length} 条无效用例（非字符串或为空）`)
-      }
-
-      // 计算本次有效评测总数（若指定 data_count>0 则取其与可用用例数的较小值）
-      const limit = typeof params?.data_count === 'number' && params.data_count > 0
-        ? Math.min(params.data_count, sanitizedCases.length)
-        : sanitizedCases.length
-
-      // 初始化前端进度（异步/同步均显示总数，避免出现 0/0）
-      setRagasStatus({
-        status: 'processing',
-        progress: isAsync ? 0 : undefined,
-        completed_cases: 0,
-        failed_cases: 0,
-        total: limit,
-      })
-      if (!isAsync) {
-        // 同步模式：使用占位进度条展示“活动中”效果
-        setRagasSyncProgress(5)
-      }
+      // 映射为后端期望的字段类型与结构：question_id 统一为字符串，忽略多余字段
+      const mappedCases = testCases.map(tc => ({
+        question_id: String((tc as any).question_id ?? (tc as any).row_index ?? ''),
+        clinical_query: (tc as any).clinical_query,
+        ground_truth: (tc as any).ground_truth,
+      }))
 
       const response = await api.post('/api/v1/ragas/evaluate', {
-        test_cases: sanitizedCases,
-        model_name: params?.model_name || 'gpt-3.5-turbo',
-        embedding_model: params?.embedding_model,
-        data_count: params?.data_count,
+        test_cases: mappedCases,
         async_mode: isAsync
       })
-
-  
 
       if (isAsync && response.data.task_id) {
         // 异步模式：开始轮询任务状态
@@ -524,21 +431,7 @@ const RAGEvaluation: React.FC = () => {
         message.success('RAGAS评估完成')
         console.log('RAGAS评估结果:', response.data)
         setRagasResults(response.data.results || [])
-        if (!isAsync) {
-          const completedCount = Array.isArray(response.data.results) ? response.data.results.length : sanitizedCases.length
-          setRagasStatus(prev => ({
-            status: 'completed',
-            progress: 100,
-            completed_cases: completedCount,
-            failed_cases: 0,
-            total: prev?.total ?? sanitizedCases.length,
-          }))
-          setRagasSyncProgress(100)
-        }
-        if (response.data.output_filename) {
-          setOutputFilename(response.data.output_filename)
-          message.success(`结果文件已保存: ${response.data.output_filename}`)
-        }
+        setRagasCompleted(true)
 
         // 更新Excel评测结果，合并RAGAS评分
         setExcelEvaluationStatus(prevStatus => ({
@@ -562,31 +455,8 @@ const RAGEvaluation: React.FC = () => {
       }
     } catch (error: any) {
       console.error('RAGAS评估失败:', error)
-      const detail = error?.response?.data?.detail ?? error?.response?.data ?? error?.message ?? error
-      let msg: string
-      if (typeof detail === 'string') {
-        msg = detail
-      } else if (Array.isArray(detail)) {
-        msg = detail.map((d) => (typeof d === 'string' ? d : (d?.msg || d?.error || JSON.stringify(d)))).join('; ')
-      } else if (detail && typeof detail === 'object') {
-        msg = detail?.error || detail?.message || JSON.stringify(detail)
-      } else {
-        msg = String(detail)
-      }
-      message.error('RAGAS评估失败：' + msg)
-      if (!isAsync) {
-        setRagasStatus(prev => ({
-          status: 'failed',
-          progress: 100,
-          completed_cases: 0,
-          failed_cases: (prev?.total ?? sanitizedCases.length),
-          total: prev?.total ?? sanitizedCases.length,
-        }))
-        setRagasSyncProgress(100)
-      }
-      throw new Error(msg)
-    } finally {
-      setRagasSyncInProgress(false)
+      message.error('RAGAS评估失败：' + (error.response?.data?.detail || error.message))
+      throw error
     }
   }
 
@@ -597,52 +467,74 @@ const RAGEvaluation: React.FC = () => {
         const response = await api.get(`/api/v1/ragas/evaluate/${taskId}/status`)
         const status = response.data
 
-        // 同步到前端进度状态
-        setRagasStatus(prev => ({
-          progress: typeof status.progress === 'number' ? Math.round(status.progress) : prev?.progress,
-          completed_cases: status.completed_cases,
-          failed_cases: status.failed_cases,
-          status: status.status,
-          total: prev?.total
-            ?? (typeof status.total === 'number' ? status.total : undefined)
-            ?? (typeof status.total_cases === 'number' ? status.total_cases : undefined)
-            ?? (typeof status.completed_cases === 'number' && typeof status.failed_cases === 'number'
-                  ? status.completed_cases + status.failed_cases
-                  : undefined),
-        }))
+        // 实时更新进度与最近结果
+        setExcelEvaluationStatus(prev => {
+          const processed = status.processed_cases ?? ((status.completed_cases || 0) + (status.failed_cases || 0))
+          const total = status.total_cases ?? prev.total
+
+          // 合并最近结果，按 question_id 去重
+          const incoming: any[] = Array.isArray(status.recent_results) ? status.recent_results : []
+          const map = new Map<string, any>((prev.results || []).map((r: any) => [String(r.question_id), r]))
+          for (const r of incoming) {
+            const key = String(r.question_id)
+            const prevVal = map.get(key) || {}
+            const mergedVal: any = { ...prevVal, ...r, ragas_evaluated: true }
+            // 将后端的 trace 或 trace_preview 合并到前端记录，便于进行中展示中间过程
+            if (!mergedVal.trace) {
+              mergedVal.trace = (r as any).trace ?? (r as any).trace_preview ?? (prevVal as any).trace
+            }
+            map.set(key, mergedVal)
+          }
+          const merged = Array.from(map.values())
+
+          return {
+            ...prev,
+            progress: processed,
+            total,
+            current_case: incoming.length > 0 ? String(incoming[0].question_id) : prev.current_case,
+            results: merged,
+            runtime: {
+              elapsed_seconds: status.elapsed_seconds,
+              eta_seconds: status.eta_seconds,
+              throughput_cpm: status.throughput_cpm,
+            },
+          }
+        })
 
         if (status.status === 'completed') {
           clearInterval(interval)
           setRagasPolling(null)
 
-          // 获取评测结果
+          // 获取最终评测结果
           const resultsResponse = await api.get(`/api/v1/ragas/evaluate/${taskId}/results`)
-          setRagasResults(resultsResponse.data.results || [])
+          const finalResults: any[] = resultsResponse.data.results || []
+          setRagasResults(finalResults)
+          setRagasCompleted(true)
+
+          // 保存汇总信息（若后端提供）
+          try { setRagasSummary(resultsResponse.data?.summary ?? null) } catch (e) {}
+
 
           message.success('RAGAS评估完成！')
 
-          // 更新Excel评测结果，合并RAGAS评分
-          setExcelEvaluationStatus(prevStatus => ({
-            ...prevStatus,
-            results: prevStatus.results.map(result => {
-              const ragasResult = resultsResponse.data.results.find((r: any) => r.question_id === result.question_id)
-              if (ragasResult) {
-                return {
-                  ...result,
-                  ragas_scores: ragasResult.ragas_scores,
-                  ragas_evaluated: true
-                }
-              }
-              return result
-            })
-          }))
+          // 合并最终结果：以最终结果为准，覆盖/补全中间结果；并标记完成状态
+          setExcelEvaluationStatus(prevStatus => {
+            const map = new Map<string, any>((prevStatus.results || []).map((r: any) => [String(r.question_id), r]))
+            for (const r of finalResults) {
+              const key = String(r.question_id)
+              map.set(key, { ...(map.get(key) || {}), ...r, ragas_evaluated: true, status: 'success' })
+            }
+            return {
+              ...prevStatus,
+              is_running: false,
+              progress: prevStatus.total,
+              results: Array.from(map.values()),
+            }
+          })
         } else if (status.status === 'failed') {
           clearInterval(interval)
           setRagasPolling(null)
-          message.error('RAGAS评估失败：' + (status.error || '未知错误'))
-        } else {
-          // 任务仍在进行中，显示进度
-          console.log('RAGAS评估进度:', status)
+          message.error('RAGAS评估失败：' + (status.error_message || status.error || '未知错误'))
         }
       } catch (error: any) {
         console.error('获取RAGAS任务状态失败：', error)
@@ -656,7 +548,7 @@ const RAGEvaluation: React.FC = () => {
   const stopRagasEvaluation = async () => {
     if (ragasTaskId) {
       try {
-        await api.post(`/api/v1/ragas/evaluate/${ragasTaskId}/stop`)
+        await api.delete(`/api/v1/ragas/evaluate/${ragasTaskId}`)
 
         if (ragasPolling) {
           clearInterval(ragasPolling)
@@ -677,24 +569,22 @@ const RAGEvaluation: React.FC = () => {
       return
     }
 
-    try {
-      // 后端 fastapi 接口定义为 test_cases: List[Dict[str, Any]] (body) + filename: str (query)
-      // 因此请求体必须是“数组”，filename 作为查询参数传递
-      const response = await api.post(
-        '/api/v1/acrac/excel-evaluation/start-evaluation',
-        excelTestCases,
-        { params: { filename: excelFile?.name || '' } }
-      )
+    // 应用“数据量选择”
+    const useCount = selectedDataCount && selectedDataCount > 0 ? Math.min(selectedDataCount, excelTestCases.length) : excelTestCases.length
+    const casesToEval = excelTestCases.slice(0, useCount)
 
-      if (response.data?.success) {
-        message.success('开始Excel评测')
-        // 开始轮询状态
-        startExcelStatusPolling()
-      }
+    try {
+      // 走统一的 RAGAS 评测流程（与 RAG助手 保持一致）
+      setExcelEvaluationStatus(prev => ({ ...prev, is_running: true, progress: 0, total: casesToEval.length, error: null }))
+      setRagasCompleted(false)
+      setRagasResults([])
+      try { setRagasSummary(null) } catch (e) {}
+      await runRAGASEvaluation(casesToEval, ragasAsyncMode)
     } catch (error: any) {
       const detail = error?.response?.data?.detail;
       const msg = typeof detail === 'object' ? JSON.stringify(detail) : (detail || error.message || String(error));
       message.error('启动评测失败：' + msg)
+      setExcelEvaluationStatus(prev => ({ ...prev, is_running: false }))
     }
   }
 
@@ -930,6 +820,14 @@ const RAGEvaluation: React.FC = () => {
       }
     },
     {
+      title: '过程',
+      key: 'trace',
+      width: 120,
+      render: (_: any, record: any) => (
+        <Button size="small" onClick={() => openTraceViewer(record)}>查看</Button>
+      )
+    },
+    {
       title: '时间',
       dataIndex: 'timestamp',
       width: 150,
@@ -949,123 +847,90 @@ const RAGEvaluation: React.FC = () => {
       width: 300,
       ellipsis: true
     },
+  // 历史任务列表列定义
+  const historyColumns = [
+    { title: '任务ID', dataIndex: 'task_id', width: 180, ellipsis: true },
+    { title: '任务名称', dataIndex: 'task_name', width: 220, ellipsis: true },
+    { title: '模型(推理LLM)', dataIndex: 'model_name', width: 180, ellipsis: true },
+    { title: '用例数', dataIndex: 'total_cases', width: 90 },
+    {
+      title: '状态', dataIndex: 'status', width: 100,
+      render: (s: string) => {
+        const m: any = { completed: { color: 'success', text: '已完成' }, processing: { color: 'processing', text: '进行中' }, pending: { color: 'default', text: '待处理' }, failed: { color: 'error', text: '失败' }, cancelled: { color: 'warning', text: '取消' } }
+        const c = m[s] || { color: 'default', text: s }
+        return <Tag color={c.color}>{c.text}</Tag>
+      }
+
+  const exportHistoryRecord = async (task: any) => {
+    try {
+      const resp = await api.get(`/api/v1/ragas/history/${task.task_id}`)
+      const data = resp.data || {}
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ragas_task_${task.task_id}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      message.success('导出成功')
+    } catch (e: any) {
+      message.error('导出失败：' + (e.response?.data?.detail || e.message))
+    }
+  }
+
+  const deleteHistoryRecord = async (task: any) => {
+    Modal.confirm({
+      title: '确认删除该历史评测记录？',
+      content: `任务ID: ${task.task_id}`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await api.delete(`/api/v1/ragas/history/${task.task_id}`)
+          message.success('删除成功')
+          loadHistoryData()
+        } catch (e: any) {
+          message.error('删除失败：' + (e.response?.data?.detail || e.message))
+        }
+      }
+    })
+  }
+
+    },
+    { title: '开始时间', dataIndex: 'start_time', width: 170, render: (t: string) => t ? new Date(t).toLocaleString() : '-' },
+    {
+      title: '操作', key: 'action', fixed: 'right' as const, width: 110,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button size="small" onClick={() => openHistoryDetail(record)}>查看详情</Button>
+          <Button size="small" onClick={() => exportHistoryRecord(record)}>导出</Button>
+          <Button size="small" danger onClick={() => deleteHistoryRecord(record)}>删除</Button>
+        </Space>
+      )
+    }
+  ]
+
+  const openHistoryDetail = async (task: any) => {
+    try {
+      setLoading(true)
+      const resp = await api.get(`/api/v1/ragas/history/${task.task_id}`)
+      setHistoryDetailTask(resp.data?.task || task)
+      setHistoryDetailResults(resp.data?.results || [])
+      setHistoryDetailVisible(true)
+    } catch (e: any) {
+      message.error('加载任务详情失败：' + (e.response?.data?.detail || e.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
     {
       title: '标准答案',
       dataIndex: 'ground_truth',
       width: 200,
       ellipsis: true
     }
-  ]
-
-  const normalizeRecommendations = (candidate: any): any[] => {
-    if (!candidate) return []
-    if (Array.isArray(candidate)) return candidate
-    if (Array.isArray(candidate?.recommendations)) return candidate.recommendations
-    return []
-  }
-
-  const extractRecommendationList = (record: any): any[] => {
-    const candidates = [
-      record?.trace?.llm_parsed?.recommendations,
-      record?.llm_recommendations,
-      record?.metadata?.rag_result?.llm_recommendations,
-      record?.metadata?.rag_result?.trace?.llm_parsed?.recommendations,
-      record?.metadata?.trace?.llm_parsed?.recommendations,
-      record?.metadata?.rag_result?.llm_parsed?.recommendations,
-      // 回退到场景推荐（非LLM选择，但包含检查项目数据）
-      record?.trace?.scenarios_with_recommendations?.[0]?.recommendations,
-      record?.metadata?.rag_result?.scenarios_with_recommendations?.[0]?.recommendations,
-    ]
-    for (const item of candidates) {
-      const normalized = normalizeRecommendations(item)
-      if (normalized.length) {
-        return normalized
-      }
-    }
-    return []
-  }
-
-  // 简单的结果持久化，避免页面意外刷新后丢失
-  useEffect(() => {
-    try {
-      const payload = JSON.stringify({ ragasResults, ragasStatus })
-      localStorage.setItem('acrac_ragas_results_cache', payload)
-    } catch (e) {}
-  }, [ragasResults, ragasStatus])
-
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem('acrac_ragas_results_cache')
-      if (v) {
-        const obj = JSON.parse(v)
-        if (Array.isArray(obj?.ragasResults)) setRagasResults(obj.ragasResults)
-        if (obj?.ragasStatus) setRagasStatus(obj.ragasStatus)
-      }
-    } catch (e) {}
-  }, [])
-
-  const resolveAnswerText = (record: any): string => {
-    const sources = [
-      record?.rag_answer,
-      record?.answer,
-      record?.metadata?.rag_answer,
-      record?.metadata?.rag_result?.rag_answer,
-    ]
-    for (const src of sources) {
-      if (typeof src === 'string' && src.trim().length > 0) {
-        return src
-      }
-    }
-    return ''
-  }
-
-  const resolveScenarioText = (scenario: any): string => {
-    if (!scenario) return ''
-    const full = scenario.clinical_scenario || scenario.description_zh || scenario.scenario_description || scenario.description
-    if (full && typeof full === 'string' && full.trim()) {
-      return full.trim()
-    }
-    const panelTopic = [scenario.panel, scenario.topic].filter(Boolean).join('/')
-    return panelTopic || '未知临床场景'
-  }
-
-  const ragasResultColumns = [
-    { title: '题号', dataIndex: 'question_id', key: 'question_id', width: 80 },
-    { title: '临床场景', dataIndex: 'clinical_query', key: 'clinical_query', width: 300, ellipsis: true },
-    { title: '标准答案', dataIndex: 'ground_truth', key: 'ground_truth', width: 200, ellipsis: true },
-    {
-      title: '推荐检查(用于评分)', key: 'rag_answer', width: 300, ellipsis: true,
-      render: (record: any) => {
-        // 优先从 trace.llm_parsed.recommendations 读取TOP3，回退到 rag_answer 文本
-        const recs = extractRecommendationList(record)
-        if (recs.length) {
-          return (
-            <div style={{ fontSize: 12 }}>
-              {recs.slice(0, 3).map((rec: any, idx: number) => {
-                const title = rec?.procedure_name || rec?.name || rec?.recommendation || rec?.procedure || rec?.procedure_name_zh || '未知检查'
-                const modality = rec?.modality ? ` (${rec.modality})` : ''
-                const rating = rec?.appropriateness_rating ? ` · 适宜性: ${rec.appropriateness_rating}` : ''
-                return <div key={idx}>- {title}{modality}{rating}</div>
-              })}
-            </div>
-          )
-        }
-        const txt = resolveAnswerText(record)
-        return txt ? <span style={{ whiteSpace: 'pre-wrap' }}>{txt}</span> : <span style={{ color: '#999' }}>无</span>
-      }
-    },
-    {
-      title: 'RAGAS评分', dataIndex: 'ragas_scores', key: 'ragas_scores', width: 300,
-      render: (scores: any) => scores ? (
-        <div style={{ fontSize: '12px' }}>
-          <div>忠实度: <b>{(scores.faithfulness || 0).toFixed(3)}</b></div>
-          <div>答案相关性: <b>{(scores.answer_relevancy || 0).toFixed(3)}</b></div>
-          <div>上下文精确度: <b>{(scores.context_precision || 0).toFixed(3)}</b></div>
-          <div>上下文召回率: <b>{(scores.context_recall || 0).toFixed(3)}</b></div>
-        </div>
-      ) : <span style={{ color: '#999' }}>无</span>
-    },
-    { title: '时间', dataIndex: 'timestamp', key: 'timestamp', width: 160, render: (t: number) => new Date(t * 1000).toLocaleString() }
   ]
 
   const excelResultColumns = [
@@ -1180,6 +1045,23 @@ const RAGEvaluation: React.FC = () => {
       ),
     },
     {
+      title: '模型',
+      dataIndex: 'model',
+      key: 'model',
+      width: 140,
+      render: (m: string) => m || '-',
+    },
+    {
+      title: '耗时(推理/评测)',
+      key: 'durations',
+      width: 160,
+      render: (record: any) => {
+        const inf = record.inference_ms != null ? `${record.inference_ms}ms` : '-'
+        const eva = record.evaluation_ms != null ? `${record.evaluation_ms}ms` : '-'
+        return `${inf} / ${eva}`
+      }
+    },
+    {
       title: '处理时间',
       dataIndex: 'processing_time',
       key: 'processing_time',
@@ -1191,6 +1073,14 @@ const RAGEvaluation: React.FC = () => {
   return (
     <div>
       <div className='page-title'>RAG+LLM 评测系统</div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <Space>
+          <Button icon={<HistoryOutlined />} onClick={loadHistoryData}>
+            历史记录
+          </Button>
+        </Space>
+      </div>
+
 
       <Card title="RAG+LLM 评测系统" style={{ marginBottom: 16 }}>
         {/* 步骤1: 数据上传 */}
@@ -1200,10 +1090,8 @@ const RAGEvaluation: React.FC = () => {
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Upload
                   customRequest={handleExcelUpload}
-                  openFileDialogOnClick={true}
                   accept=".xlsx,.xls"
                   maxCount={1}
-                  showUploadList={false}
                   fileList={excelFile ? [excelFile] : []}
                   onChange={({ fileList }) => {
                     if (fileList.length === 0) {
@@ -1212,7 +1100,7 @@ const RAGEvaluation: React.FC = () => {
                     }
                   }}
                 >
-                  <Button htmlType="button" icon={<FileExcelOutlined />} size="large">上传Excel文件到数据库</Button>
+                  <Button icon={<FileExcelOutlined />} size="large">上传Excel文件到数据库</Button>
                 </Upload>
                 <div style={{ marginTop: 8, color: '#666' }}>
                   支持.xlsx和.xls格式，需包含：题号、临床场景、首选检查项目（标准化）列
@@ -1288,6 +1176,19 @@ const RAGEvaluation: React.FC = () => {
         {/* 操作区：仅保留必要按钮 */}
         {excelTestCases.length > 0 && (
           <Card title="步骤2: 开始评测" style={{ marginBottom: 16 }}>
+            <Space wrap size={12} style={{ marginBottom: 8 }}>
+              <span>评测数据量：</span>
+              <Select style={{ width: 180 }} value={selectedDataCount} onChange={(v) => setSelectedDataCount(Number(v))}>
+                {dataCountOptions.map(opt => (
+                  <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                ))}
+              </Select>
+              <span>处理模式：</span>
+              <Select style={{ width: 180 }} value={ragasAsyncMode ? 'async' : 'sync'} onChange={(v) => setRagasAsyncMode(v === 'async')}>
+                <Option value="async">异步（推荐）</Option>
+                <Option value="sync">同步</Option>
+              </Select>
+            </Space>
             <Space>
               <Button
                 type='primary'
@@ -1306,128 +1207,22 @@ const RAGEvaluation: React.FC = () => {
               >
                 停止评测
               </Button>
+              <Button
+                onClick={exportExcelResults}
+                disabled={excelEvaluationStatus.results.length === 0}
+                icon={<DownloadOutlined />}
+              >
+                导出结果
+              </Button>
+              <Button
+                icon={<HistoryOutlined />}
+                onClick={loadHistoryData}
+              >
+                历史记录
+              </Button>
             </Space>
           </Card>
         )}
-
-          {/* 步骤2B: RAGAS 评分参数与启动 */}
-        {excelTestCases.length > 0 && (
-            <Card title="步骤2B: RAGAS 评分参数与启动" style={{ marginBottom: 16 }}>
-              <Row gutter={16} align="middle">
-                <Col span={8}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text strong>LLM 模型</Text>
-                    <Select
-                      showSearch
-                      allowClear
-                      placeholder="如 gpt-3.5-turbo / deepseek-chat / qwen2.5-32b-instruct"
-                      options={llmModels}
-                      value={selectedLLM}
-                      onChange={(v) => setSelectedLLM(v)}
-                      onSearch={(v) => setSelectedLLM(v)}
-                      filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
-                    />
-                  </Space>
-                </Col>
-                <Col span={8}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text strong>Embedding 模型（可选）</Text>
-                    <Select
-                      showSearch
-                      allowClear
-                      placeholder="如 BAAI/bge-large-zh-v1.5 / BAAI/bge-m3"
-                      options={[
-                        { value: 'BAAI/bge-large-zh-v1.5', label: 'BAAI/bge-large-zh-v1.5' },
-                        { value: 'BAAI/bge-m3', label: 'BAAI/bge-m3' },
-                      ]}
-                      value={selectedEmbedding}
-                      onChange={(v) => setSelectedEmbedding(v)}
-                      onSearch={(v) => setSelectedEmbedding(v)}
-                      filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
-                    />
-                  </Space>
-                </Col>
-                <Col span={8}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text strong>评测数量（任意整数，-1 表示全部）</Text>
-                    <InputNumber
-                      style={{ width: '100%' }}
-                      placeholder="如 5 / 10 / 20 / -1"
-                      value={dataCount}
-                      onChange={(v) => setDataCount(typeof v === 'number' ? v : undefined)}
-                    />
-                  </Space>
-                </Col>
-              </Row>
-              <Row gutter={16} style={{ marginTop: 16 }}>
-                <Col span={8}>
-                  <Space>
-                    <Text strong>异步模式</Text>
-                    <Switch checked={ragasAsync} onChange={setRagasAsync} />
-                    <Text type="secondary">同步模式可直接返回评分并给出导出文件名</Text>
-                  </Space>
-                </Col>
-                <Col span={16}>
-                  <Space>
-                    <Button
-                      type="primary"
-                      icon={<PlayCircleOutlined />}
-                      onClick={async () => {
-                        try {
-                          const resp = await runRAGASEvaluation(excelTestCases, ragasAsync, {
-                            model_name: selectedLLM,
-                            embedding_model: selectedEmbedding,
-                            data_count: dataCount,
-                          })
-                          if (!ragasAsync && resp?.output_filename) {
-                            setOutputFilename(resp.output_filename)
-                          }
-                        } catch (e) {}
-                      }}
-                      disabled={excelTestCases.length === 0}
-                    >
-                      开始 RAGAS 评分
-                    </Button>
-                    {outputFilename && (
-                      <Badge status="success" text={`已保存文件: ${outputFilename}`} />
-                    )}
-                  </Space>
-                </Col>
-              </Row>
-            </Card>
-          )}
-        {/* RAGAS 评分进度（异步真实进度 + 同步占位进度） */}
-        {(ragasSyncInProgress || (ragasStatus && ['processing', 'failed'].includes(ragasStatus.status || ''))) && (
-          <Card title="RAGAS 评分进度" style={{ marginBottom: 16 }}>
-            {ragasSyncInProgress && (
-              <div style={{ marginBottom: 8 }}>
-                <Text type="secondary">同步模式：正在计算评分，请稍候…</Text>
-              </div>
-            )}
-            <Progress
-              percent={
-                ragasSyncInProgress
-                  ? ragasSyncProgress
-                  : (typeof ragasStatus?.progress === 'number'
-                      ? (ragasStatus.progress === 0 && (ragasStatus?.status === 'processing') ? 1 : ragasStatus.progress)
-                      : 0)
-              }
-              status="active"
-            />
-            <div style={{ marginTop: 8 }}>
-              <Text>
-                已完成: {ragasStatus?.completed_cases ?? '-'}
-                {typeof ragasStatus?.total === 'number' ? ` / ${ragasStatus.total}` : ''}，失败: {ragasStatus?.failed_cases ?? '-'}
-              </Text>
-              {ragasStatus?.status === 'failed' && (
-                <div style={{ marginTop: 4 }}>
-                  <Text type="danger">同步RAGAS评分失败，请查看控制台或后端日志。</Text>
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-
 
         {/* 步骤3: 评测进度显示 */}
         {excelEvaluationStatus.is_running && (
@@ -1445,8 +1240,14 @@ const RAGEvaluation: React.FC = () => {
                   <Text type="secondary">当前处理: {excelEvaluationStatus.current_case}</Text>
                 </div>
               )}
+              <div style={{ marginTop: 4 }}>
+                <Space size={16}>
+                  <Text type="secondary">用时: {formatSeconds(excelEvaluationStatus.runtime?.elapsed_seconds)}</Text>
+                  <Text type="secondary">预计剩余: {formatSeconds(excelEvaluationStatus.runtime?.eta_seconds)}</Text>
+                  <Text type="secondary">吞吐: {excelEvaluationStatus.runtime?.throughput_cpm ?? '-'} 条/分</Text>
+                </Space>
+              </div>
             </div>
-
 
             {/* 中间实时结果展示（最近10条） */}
             {Array.isArray(excelEvaluationStatus.results) && excelEvaluationStatus.results.length > 0 && (
@@ -1466,7 +1267,7 @@ const RAGEvaluation: React.FC = () => {
         )}
 
         {/* 步骤5: 评测结果 */}
-        {excelEvaluationStatus.results.length > 0 && (
+        {((Array.isArray(excelEvaluationStatus.results) && excelEvaluationStatus.results.length > 0) || (Array.isArray(ragasResults) && ragasResults.length > 0) || ragasCompleted) ? (
           <Card
             title="步骤4: 评测结果"
             extra={
@@ -1479,15 +1280,59 @@ const RAGEvaluation: React.FC = () => {
               </Button>
             }
           >
+            {/* 汇总卡片（平均分等） */}
+            {(
+              ragasSummary || (Array.isArray(excelEvaluationStatus.results) && excelEvaluationStatus.results.some((r:any)=>r?.ragas_scores))
+            ) && (
+              <Row gutter={16} style={{ marginBottom: 16 }}>
+                <Col span={6}>
+                  <Card size="small" title="忠实度(均值)">
+                    <b>{
+                      (ragasSummary?.faithfulness_avg != null)
+                        ? Number(ragasSummary.faithfulness_avg).toFixed(3)
+                        : (()=>{ const arr=(excelEvaluationStatus.results||[]).map((r:any)=>Number(r?.ragas_scores?.faithfulness)).filter((v:number)=>Number.isFinite(v)); return arr.length? (arr.reduce((a:number,b:number)=>a+b,0)/arr.length).toFixed(3):'-' })()
+                    }</b>
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card size="small" title="答案相关性(均值)">
+                    <b>{
+                      (ragasSummary?.answer_relevancy_avg != null)
+                        ? Number(ragasSummary.answer_relevancy_avg).toFixed(3)
+                        : (()=>{ const arr=(excelEvaluationStatus.results||[]).map((r:any)=>Number(r?.ragas_scores?.answer_relevancy)).filter((v:number)=>Number.isFinite(v)); return arr.length? (arr.reduce((a:number,b:number)=>a+b,0)/arr.length).toFixed(3):'-' })()
+                    }</b>
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card size="small" title="上下文精确度(均值)">
+                    <b>{
+                      (ragasSummary?.context_precision_avg != null)
+                        ? Number(ragasSummary.context_precision_avg).toFixed(3)
+                        : (()=>{ const arr=(excelEvaluationStatus.results||[]).map((r:any)=>Number(r?.ragas_scores?.context_precision)).filter((v:number)=>Number.isFinite(v)); return arr.length? (arr.reduce((a:number,b:number)=>a+b,0)/arr.length).toFixed(3):'-' })()
+                    }</b>
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card size="small" title="上下文召回率(均值)">
+                    <b>{
+                      (ragasSummary?.context_recall_avg != null)
+                        ? Number(ragasSummary.context_recall_avg).toFixed(3)
+                        : (()=>{ const arr=(excelEvaluationStatus.results||[]).map((r:any)=>Number(r?.ragas_scores?.context_recall)).filter((v:number)=>Number.isFinite(v)); return arr.length? (arr.reduce((a:number,b:number)=>a+b,0)/arr.length).toFixed(3):'-' })()
+                    }</b>
+                  </Card>
+                </Col>
+              </Row>
+            )}
+
 
             {/* Excel评测结果 */}
-            {excelEvaluationStatus.results.length > 0 && (
+            {(((excelEvaluationStatus.results && excelEvaluationStatus.results.length > 0) || (ragasResults && ragasResults.length > 0)) ? (
               <div style={{ marginBottom: 24 }}>
                 <Title level={4}>Excel评测结果</Title>
                 <Table
                   rowKey="question_id"
                   size="small"
-                  dataSource={excelEvaluationStatus.results}
+                  dataSource={(excelEvaluationStatus.results && excelEvaluationStatus.results.length > 0) ? excelEvaluationStatus.results : ragasResults}
                   columns={excelResultColumns}
                   pagination={{
                     pageSize: 10,
@@ -1530,111 +1375,15 @@ const RAGEvaluation: React.FC = () => {
                   }}
                 />
               </div>
-            )}
+            ) : (
+              <div style={{ marginBottom: 24 }}>
+                <Title level={4}>Excel评测结果</Title>
+                <div style={{ color: '#999' }}>暂无可展示的明细。您可以点击页面右上角“历史记录”查看任务记录与统计。</div>
+              </div>
+            ))}
 
           </Card>
-        )}
-
-        {/* RAGAS 同步结果展示（不依赖 Excel 运行结果） */}
-        {(ragasResults.length > 0 || getCombinedRagasItems().length > 0) && (
-          <Card
-            title="RAGAS 评分结果（可视化）"
-            style={{ marginBottom: 16 }}
-            extra={
-              <Space>
-                {outputFilename ? <Text>结果文件: {outputFilename}</Text> : null}
-                <Button size="small" icon={<DownloadOutlined />} onClick={() => downloadRagasResults('json')}>下载JSON</Button>
-                <Button size="small" icon={<FileExcelOutlined />} onClick={() => downloadRagasResults('excel')}>下载Excel</Button>
-              </Space>
-            }
-          >
-            <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col span={6}>
-                <Card size="small" title="忠实度（分布）" bordered>
-                  <div style={{ marginBottom: 8 }}>
-                    <Text type="secondary">平均值: {metricAvg(metricValues('faithfulness')).toFixed(3)}</Text>
-                  </div>
-                  {renderTinyBars(metricValues('faithfulness'))}
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card size="small" title="答案相关性（分布）" bordered>
-                  <div style={{ marginBottom: 8 }}>
-                    <Text type="secondary">平均值: {metricAvg(metricValues('answer_relevancy')).toFixed(3)}</Text>
-                  </div>
-                  {renderTinyBars(metricValues('answer_relevancy'))}
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card size="small" title="上下文精确度（分布）" bordered>
-                  <div style={{ marginBottom: 8 }}>
-                    <Text type="secondary">平均值: {metricAvg(metricValues('context_precision')).toFixed(3)}</Text>
-                  </div>
-                  {renderTinyBars(metricValues('context_precision'))}
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card size="small" title="上下文召回率（分布）" bordered>
-                  <div style={{ marginBottom: 8 }}>
-                    <Text type="secondary">平均值: {metricAvg(metricValues('context_recall')).toFixed(3)}</Text>
-                  </div>
-                  {renderTinyBars(metricValues('context_recall'))}
-                </Card>
-              </Col>
-            </Row>
-
-            <Table
-              rowKey={(r:any) => String(r.question_id)}
-              size="small"
-              dataSource={ragasResults && ragasResults.length > 0 ? ragasResults : getCombinedRagasItems()}
-              columns={ragasResultColumns}
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1000 }}
-              expandable={{
-                expandedRowRender: (record: any) => {
-                  const trace = (record?.trace || record?.metadata?.rag_result?.trace) || null
-                  return (
-                    <div>
-                      <Title level={5}>检索/排序追踪</Title>
-                      {trace ? (
-                        <div>
-                          <Text strong>Recall:</Text>
-                          <div style={{ fontSize: 12, marginBottom: 8 }}>
-                            {Array.isArray(trace.recall_scenarios) && trace.recall_scenarios.length > 0 ? (
-                              trace.recall_scenarios.slice(0, 8).map((s: any, idx: number) => (
-                                <div key={idx}>
-                                  #{idx+1} {s.id} · {resolveScenarioText(s)} · sim={typeof s.similarity === 'number' ? s.similarity.toFixed(3) : s.similarity}
-                                </div>
-                              ))
-                            ) : (
-                              <span style={{ color: '#999' }}>无</span>
-                            )}
-                          </div>
-                          <Text strong>Rerank:</Text>
-                          <div style={{ fontSize: 12 }}>
-                            {Array.isArray(trace.rerank_scenarios) && trace.rerank_scenarios.length > 0 ? (
-                              trace.rerank_scenarios.slice(0, 8).map((s: any, idx: number) => (
-                                <div key={idx}>
-                                  #{idx+1} {s.id} · {resolveScenarioText(s)} · score={typeof s._rerank_score === 'number' ? s._rerank_score.toFixed(3) : s._rerank_score}
-                                </div>
-                              ))
-                            ) : (
-                              <span style={{ color: '#999' }}>无</span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#999' }}>无 trace（结果中未包含追踪数据）</span>
-                      )}
-                    </div>
-                  )
-                },
-                rowExpandable: () => true
-              }}
-            />
-          </Card>
-        )}
-
+        ) : null}
       </Card>
 
 
@@ -1692,6 +1441,7 @@ const RAGEvaluation: React.FC = () => {
           pagination={{ pageSize: 20, showSizeChanger: true }}
           scroll={{ x: 600, y: 400 }}
         />
+
       </Modal>
 
       {/* 历史记录模态框 */}
@@ -1702,18 +1452,130 @@ const RAGEvaluation: React.FC = () => {
         footer={null}
         width={1200}
       >
+        {historyStats && (
+          <div style={{ marginBottom: 16 }}>
+            <Row gutter={16} style={{ marginBottom: 8 }}>
+              <Col span={6}><Statistic title="总任务数" value={historyStats.total_tasks ?? 0} /></Col>
+              <Col span={6}><Statistic title="最近7天任务" value={historyStats.recent_tasks ?? 0} /></Col>
+              <Col span={6}><Statistic title="平均处理时长(分)" value={historyStats.avg_processing_time_min ?? 0} precision={2} /></Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Card size="small" title="状态分布" bordered>
+                  <div style={{ fontSize: 12 }}>
+                    {['completed','processing','pending','failed','cancelled'].map(k => (
+
+                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span>{k}</span>
+                        <b>{historyStats.status_distribution?.[k] ?? 0}</b>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card size="small" title="模型使用Top" bordered>
+                  <div>
+                    {Object.entries(historyStats.model_usage || {}).slice(0,6).map(([name, cnt]: any, idx: number) => {
+                      const total = Object.values(historyStats.model_usage || {}).reduce((a: any,b: any)=> (a as number)+(b as number), 0) || 1
+                      const percent = Math.round((Number(cnt) / total) * 100)
+                      return (
+
+
+                        <div key={name} style={{ marginBottom: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 12 }}>{idx+1}. {name}</span>
+                            <span style={{ fontSize: 12 }}>{cnt}（{percent}%）</span>
+                          </div>
+                          <div style={{ background: '#f0f0f0', height: 8, borderRadius: 4 }}>
+                            <div style={{ width: `${percent}%`, height: 8, background: '#1677ff', borderRadius: 4 }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+        )}
+
         <Table
-          rowKey="question_id"
+          rowKey={(r:any) => r.task_id || r.question_id}
           size="small"
           dataSource={historyData}
-          columns={resultColumns}
+          columns={historyColumns}
           pagination={{
-            pageSize: 5,
+            pageSize: 10,
             showSizeChanger: true
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1100 }}
         />
       </Modal>
+      {/* 历史任务详情模态框 */}
+      <Modal
+        title={`任务详情 - ${historyDetailTask?.task_name || historyDetailTask?.task_id || ''}`}
+        open={historyDetailVisible}
+        onCancel={() => setHistoryDetailVisible(false)}
+        footer={null}
+        width={1200}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Space size={16} wrap>
+            <Statistic title="用例数" value={historyDetailTask?.total_cases ?? '-'} />
+            <Statistic title="耗时(秒)" value={historyDetailTask?.processing_time ?? '-'} precision={2} />
+            <Statistic title="推理LLM" value={historyDetailTask?.model_name || '-'} />
+            <Statistic title="评测LLM" value={(historyDetailResults.find((r: any) => r?.evaluation_metadata?.ragas_llm_model)?.evaluation_metadata?.ragas_llm_model) || '-'} />
+          </Space>
+        </div>
+        <Table
+          rowKey={(r:any) => r.question_id || r.id}
+          size="small"
+          dataSource={historyDetailResults}
+          columns={[
+            { title: '题号', dataIndex: 'question_id', width: 80 },
+            { title: '临床场景', dataIndex: 'clinical_query', width: 320, ellipsis: true },
+            { title: '状态', dataIndex: 'status', width: 100, render: (s: string) => <Tag>{s}</Tag> },
+            { title: 'RAGAS评分', dataIndex: 'ragas_scores', width: 260, render: (scores: any) => scores ? (
+              <Space direction="vertical" size="small">
+                {Object.entries(scores).map(([k,v]) => (<Text key={k} style={{ fontSize: 12 }}>{k}: <Text strong>{typeof v === 'number' ? (v as number).toFixed(3) : String(v)}</Text></Text>))}
+              </Space>
+            ) : <Text type="secondary">-</Text> }
+          ]}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          scroll={{ x: 1000, y: 480 }}
+        />
+      </Modal>
+
+      {/* 中间过程详情模态框 */}
+      <Modal
+        title="中间过程详情"
+        open={traceViewerVisible}
+        onCancel={() => setTraceViewerVisible(false)}
+        footer={null}
+        width={900}
+      >
+        <div style={{ maxHeight: 480, overflow: 'auto' }}>
+          <div style={{ marginBottom: 12 }}>
+            <Text strong>召回场景(前3)</Text>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify((traceViewerData as any)?.recall_scenarios ?? (traceViewerData as any)?.recall ?? [], null, 2)}</pre>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <Text strong>重排场景(前3)</Text>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify((traceViewerData as any)?.rerank_scenarios ?? (traceViewerData as any)?.rerank ?? [], null, 2)}</pre>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <Text strong>最终Prompt</Text>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{(traceViewerData as any)?.final_prompt_preview ?? (traceViewerData as any)?.final_prompt ?? '-'}</pre>
+          </div>
+          <div>
+            <Text strong>LLM解析的推荐</Text>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify((traceViewerData as any)?.llm_recommendations ?? (traceViewerData as any)?.llm_parsed ?? {}, null, 2)}</pre>
+          </div>
+        </div>
+      </Modal>
+
+
     </div>
   )
 }
