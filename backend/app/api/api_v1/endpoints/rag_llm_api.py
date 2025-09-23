@@ -4,7 +4,7 @@ RAG+LLM智能推荐API端点
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 from pathlib import Path
 from app.core.config import settings
@@ -38,6 +38,7 @@ class IntelligentRecommendationResponse(BaseModel):
     llm_recommendations: Optional[Dict[str, Any]] = None
     scenarios: Optional[list] = None
     scenarios_with_recommendations: Optional[list] = None
+    contexts: Optional[List[str]] = Field(None, description="RAGAS评测用的上下文列表")
     processing_time_ms: Optional[int] = None
     model_used: Optional[str] = None
     embedding_model_used: Optional[str] = None
@@ -101,6 +102,7 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
             "success": result["success"],
             "query": result.get("query"),
             "llm_recommendations": result.get("llm_recommendations"),
+            "contexts": result.get("contexts"),  # 始终包含contexts字段用于RAGAS评测
             "processing_time_ms": result.get("processing_time_ms"),
             "model_used": result.get("model_used"),
             "embedding_model_used": result.get("embedding_model_used"),
@@ -284,6 +286,7 @@ from app.models.system_models import InferenceLog
 class RunLogCreate(BaseModel):
     query_text: str
     result: Dict[str, Any]
+    project_id: Optional[str] = Field(None, description='关联的评测项目ID')
     inference_method: Optional[str] = Field('rag', description='rag | rule_based | case_voting')
     success: Optional[bool] = True
     error_message: Optional[str] = None
@@ -308,6 +311,7 @@ async def create_run_log(payload: RunLogCreate):
         exec_seconds = (payload.execution_time_ms or 0) / 1000.0
         row = InferenceLog(
             user_id=None,
+            project_id=payload.project_id,
             query_text=payload.query_text,
             inference_method=payload.inference_method or 'rag',
             result=payload.result,
@@ -327,12 +331,40 @@ async def create_run_log(payload: RunLogCreate):
         db.close()
 
 @router.get('/runs', summary='运行历史列表', response_model=RunLogList)
-async def list_run_logs(page: int = 1, page_size: int = 20):
+async def list_run_logs(
+    page: int = 1,
+    page_size: int = 20,
+    status: Optional[str] = Query(None, description="状态筛选：success | failed"),
+    start: Optional[str] = Query(None, description="开始时间（ISO或YYYY-MM-DD）"),
+    end: Optional[str] = Query(None, description="结束时间（ISO或YYYY-MM-DD）"),
+):
     page = max(1, page)
     page_size = max(1, min(100, page_size))
     db: Session = SessionLocal()
     try:
         q = db.query(InferenceLog)
+        # 状态过滤
+        if status in ("success", "failed"):
+            q = q.filter(InferenceLog.success == (status == "success"))
+        # 时间范围过滤
+        from datetime import datetime, timedelta
+        def _parse_dt(s: str):
+            if not s:
+                return None
+            try:
+                return datetime.fromisoformat(s)
+            except Exception:
+                try:
+                    return datetime.strptime(s, "%Y-%m-%d")
+                except Exception:
+                    return None
+        start_dt = _parse_dt(start)
+        end_dt = _parse_dt(end)
+        if start_dt:
+            q = q.filter(InferenceLog.created_at >= start_dt)
+        if end_dt:
+            # 包含当天整日
+            q = q.filter(InferenceLog.created_at < (end_dt + timedelta(days=1)))
         total = q.count()
         rows = q.order_by(InferenceLog.created_at.desc(), InferenceLog.id.desc()).offset((page-1)*page_size).limit(page_size).all()
         items = [RunLogItem(
@@ -348,6 +380,31 @@ async def list_run_logs(page: int = 1, page_size: int = 20):
         raise HTTPException(status_code=500, detail=f'查询运行历史失败: {e}')
     finally:
         db.close()
+
+
+class RunLogDeleteRequest(BaseModel):
+    ids: List[int]
+
+@router.delete('/runs', summary='批量删除运行历史', response_model=Dict[str, Any])
+async def delete_run_logs(req: RunLogDeleteRequest):
+    db: Session = SessionLocal()
+    try:
+        ids = list(set(req.ids or []))
+        if not ids:
+            return {"ok": True, "deleted": 0}
+        q = db.query(InferenceLog).filter(InferenceLog.id.in_(ids))
+        deleted = 0
+        for r in q.all():
+            db.delete(r)
+            deleted += 1
+        db.commit()
+        return {"ok": True, "deleted": deleted}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f'删除运行日志失败: {e}')
+    finally:
+        db.close()
+
 
 @router.get('/runs/{log_id}', summary='运行详细', response_model=Dict[str, Any])
 async def get_run_log_detail(log_id: int):

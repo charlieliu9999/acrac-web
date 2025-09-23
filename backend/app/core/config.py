@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
 from typing import List, Optional
 import os
 from pathlib import Path
@@ -38,7 +39,32 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: List[str] = Field(
+        default=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"]
+    )
+    
+    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            # 尝试解析JSON格式
+            import json
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+            
+            # 处理类似 [url1,url2] 格式的字符串
+            if v.startswith('[') and v.endswith(']'):
+                # 移除方括号并按逗号分割
+                content = v[1:-1]
+                return [origin.strip() for origin in content.split(',') if origin.strip()]
+            
+            # 如果不是特殊格式，按逗号分割
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
     
     # Celery
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/1")  # 修复：使用docker服务名而不是localhost

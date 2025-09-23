@@ -4,12 +4,16 @@
       "llm_model": "Qwen/Qwen2.5-7B-Instruct",
       "embedding_model": "BAAI/bge-m3",
       "reranker_model": "BAAI/bge-reranker-v2-m3",
-      "base_url": "https://api.siliconflow.cn/v1"
+      "base_url": "https://api.siliconflow.cn/v1",
+      "temperature": 0.1,
+      "top_p": 0.7
     },
     "evaluation": {
-      "llm_model": "Qwen/Qwen3-32B",
+      "llm_model": "Qwen/Qwen2.5-32B-Instruct",
       "embedding_model": "BAAI/bge-m3",
-      "base_url": "https://api.siliconflow.cn/v1"
+      "base_url": "https://api.siliconflow.cn/v1",
+      "temperature": 0.1,
+      "top_p": 0.7
     }
   },
   "scenario_overrides": []

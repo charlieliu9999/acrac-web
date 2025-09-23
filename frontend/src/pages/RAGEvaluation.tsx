@@ -847,19 +847,13 @@ const RAGEvaluation: React.FC = () => {
       width: 300,
       ellipsis: true
     },
-  // 历史任务列表列定义
-  const historyColumns = [
-    { title: '任务ID', dataIndex: 'task_id', width: 180, ellipsis: true },
-    { title: '任务名称', dataIndex: 'task_name', width: 220, ellipsis: true },
-    { title: '模型(推理LLM)', dataIndex: 'model_name', width: 180, ellipsis: true },
-    { title: '用例数', dataIndex: 'total_cases', width: 90 },
     {
-      title: '状态', dataIndex: 'status', width: 100,
-      render: (s: string) => {
-        const m: any = { completed: { color: 'success', text: '已完成' }, processing: { color: 'processing', text: '进行中' }, pending: { color: 'default', text: '待处理' }, failed: { color: 'error', text: '失败' }, cancelled: { color: 'warning', text: '取消' } }
-        const c = m[s] || { color: 'default', text: s }
-        return <Tag color={c.color}>{c.text}</Tag>
-      }
+      title: '标准答案',
+      dataIndex: 'ground_truth',
+      width: 200,
+      ellipsis: true
+    }
+  ]
 
   const exportHistoryRecord = async (task: any) => {
     try {
@@ -897,6 +891,19 @@ const RAGEvaluation: React.FC = () => {
     })
   }
 
+  // 历史任务列表列定义
+  const historyColumns = [
+    { title: '任务ID', dataIndex: 'task_id', width: 180, ellipsis: true },
+    { title: '任务名称', dataIndex: 'task_name', width: 220, ellipsis: true },
+    { title: '模型(推理LLM)', dataIndex: 'model_name', width: 180, ellipsis: true },
+    { title: '用例数', dataIndex: 'total_cases', width: 90 },
+    {
+      title: '状态', dataIndex: 'status', width: 100,
+      render: (s: string) => {
+        const m: any = { completed: { color: 'success', text: '已完成' }, processing: { color: 'processing', text: '进行中' }, pending: { color: 'default', text: '待处理' }, failed: { color: 'error', text: '失败' }, cancelled: { color: 'warning', text: '取消' } }
+        const c = m[s] || { color: 'default', text: s }
+        return <Tag color={c.color}>{c.text}</Tag>
+      }
     },
     { title: '开始时间', dataIndex: 'start_time', width: 170, render: (t: string) => t ? new Date(t).toLocaleString() : '-' },
     {
@@ -924,14 +931,6 @@ const RAGEvaluation: React.FC = () => {
       setLoading(false)
     }
   }
-
-    {
-      title: '标准答案',
-      dataIndex: 'ground_truth',
-      width: 200,
-      ellipsis: true
-    }
-  ]
 
   const excelResultColumns = [
     {

@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import acrac_simple, intelligent_analysis, three_methods_api, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_evaluation_api, ragas_api
+from app.api.api_v1.endpoints import acrac_simple, intelligent_analysis, three_methods_api, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_standalone_api, evaluation_project_api, inference_evaluation_api
+# 临时注释掉 RAGAS 相关导入，解决 uvloop 兼容性问题
+# from app.api.api_v1.endpoints import ragas_evaluation_api, ragas_api
 
 api_router = APIRouter()
 
@@ -27,9 +29,20 @@ api_router.include_router(tools_api.router, prefix="/acrac/tools", tags=["tools"
 api_router.include_router(data_browse_api.router, prefix="/acrac/data", tags=["data-browse"])
 api_router.include_router(admin_data_api.router, prefix="/admin/data", tags=["admin-data"])
 
-# Excel evaluation API
+# Include Excel evaluation API
 api_router.include_router(excel_evaluation_api.router, prefix="/acrac/excel-evaluation", tags=["excel-evaluation"])
-api_router.include_router(ragas_evaluation_api.router, prefix="/acrac/ragas-evaluation", tags=["ragas-evaluation"])
 
-# RAGAS API (new implementation)
-api_router.include_router(ragas_api.router, prefix="/ragas", tags=["ragas"])
+# Include evaluation project management API
+api_router.include_router(evaluation_project_api.router, prefix="/evaluation", tags=["evaluation-projects"])
+
+# Include inference evaluation API
+api_router.include_router(inference_evaluation_api.router, prefix="/evaluation", tags=["inference-evaluation"])
+
+# 临时注释掉 RAGAS 相关路由，解决 uvloop 兼容性问题
+# api_router.include_router(ragas_evaluation_api.router, prefix="/acrac/ragas-evaluation", tags=["ragas-evaluation"])
+
+# Include RAGAS API
+# api_router.include_router(ragas_api.router, prefix="/ragas", tags=["ragas"])
+
+# Include RAGAS standalone API
+api_router.include_router(ragas_standalone_api.router, prefix="/ragas-standalone", tags=["ragas-standalone"])

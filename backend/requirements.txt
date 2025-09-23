@@ -56,8 +56,10 @@ requests==2.31.0
 python-dateutil==2.8.2
 pytz==2023.3
 
-# RAGAS evaluation
-ragas
-datasets
-langchain-openai
+# RAGAS evaluation - 使用新版本
+ragas>=0.3.0
+datasets>=2.14.0
+langchain-openai>=0.3.0
+langchain-core>=0.3.0
+langchain>=0.3.0
 anthropic>=0.34

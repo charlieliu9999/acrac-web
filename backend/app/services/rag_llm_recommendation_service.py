@@ -1226,12 +1226,19 @@ JSON中不允许出现尾随逗号
                 debug_info["step_8_parsing_success"] = "recommendations" in parsed_result
                 debug_info["step_9_total_time_ms"] = processing_time
 
+            # 构建RAGAS上下文（始终包含，用于评测）
+            contexts = self._build_ragas_contexts_from_payload({
+                "scenarios": scenarios,
+                "scenarios_with_recommendations": scenarios_with_recs
+            })
+
             result = {
                 "success": True,
                 "query": query,
                 "scenarios": scenarios,
                 "scenarios_with_recommendations": scenarios_with_recs,
                 "llm_recommendations": parsed_result,
+                "contexts": contexts,  # 新增：始终返回contexts用于RAGAS评测
                 "processing_time_ms": processing_time,
                 "model_used": context_llm_model,
                 "embedding_model_used": context_embedding_model,
@@ -1446,15 +1453,23 @@ JSON中不允许出现尾随逗号
             def clean(v):
                 try:
                     f = float(v)
-                except Exception:
+                    if f != f:  # NaN check
+                        logger.warning(f"RAGAS评分为NaN: {v}")
+                        return float('nan')  # 保留NaN而不是转换为0
+                    return f
+                except Exception as e:
+                    logger.warning(f"RAGAS评分转换失败: {v}, 错误: {e}")
                     return 0.0
-                return 0.0 if (f != f) else f
-            return {
+            
+            logger.info(f"RAGAS原始结果: {base}")
+            result = {
                 'faithfulness': clean(base.get('faithfulness', 0.0)),
                 'answer_relevancy': clean(base.get('answer_relevancy', 0.0)),
                 'context_precision': clean(base.get('context_precision', 0.0)),
                 'context_recall': clean(base.get('context_recall', 0.0)),
             }
+            logger.info(f"RAGAS清理后结果: {result}")
+            return result
         except Exception as e:
             # 进程内评测失败的兜底逻辑：
             # 1) uvloop/nest_asyncio 冲突 → 子进程隔离
@@ -1560,6 +1575,14 @@ if isinstance(res, dict):
     base = res
 elif hasattr(res, 'scores') and isinstance(res.scores, dict):
     base = res.scores
+elif hasattr(res, '_scores_dict') and isinstance(res._scores_dict, dict):
+    # 使用_scores_dict获取原始评分
+    base = {}
+    for k, v in res._scores_dict.items():
+        if isinstance(v, list) and len(v) > 0:
+            base[k] = v[0]  # 取第一个值
+        else:
+            base[k] = v
 else:
     try:
         base = dict(res)
@@ -1569,9 +1592,15 @@ else:
 def clean(v):
     try:
         f = float(v)
+        # 检查是否为NaN
+        if f != f:  # NaN检查
+            return 0.0
+        # 检查是否为无穷大
+        if f == float('inf') or f == float('-inf'):
+            return 0.0
+        return f
     except Exception:
         return 0.0
-    return 0.0 if (f != f) else f
 
 out = {
     'faithfulness': clean(base.get('faithfulness', 0.0)),

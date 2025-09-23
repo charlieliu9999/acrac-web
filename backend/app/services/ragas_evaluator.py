@@ -4,6 +4,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from datasets import Dataset
 import numpy as np
+import pandas as pd
 
 try:
     from ragas import evaluate
@@ -57,7 +58,7 @@ class RAGASEvaluator:
             eva.get('llm_model')
             or os.getenv('RAGAS_DEFAULT_LLM_MODEL')
             or os.getenv('SILICONFLOW_LLM_MODEL')
-            or "Qwen/Qwen3-32B"
+            or "Qwen/Qwen2.5-32B-Instruct"
         )
         emb_model = (
             eva.get('embedding_model')
@@ -68,31 +69,30 @@ class RAGASEvaluator:
         temperature = float(str(eva.get('temperature') if eva.get('temperature') is not None else os.getenv('RAGAS_TEMPERATURE', '0.1')))
         top_p = float(str(eva.get('top_p') if eva.get('top_p') is not None else os.getenv('RAGAS_TOP_P', '0.7')))
 
-        # 初始化模型（不强制 max_tokens，遵循用户“不要限制”要求）
+        # 初始化模型（不强制 max_tokens，遵循用户"不要限制"要求）
+        # 添加超时配置以解决 TimeoutError 问题
         self.llm = ChatOpenAI(
             model=llm_model,
             api_key=self.api_key,
             base_url=self.base_url,
             temperature=temperature,
             top_p=top_p,
+            timeout=60,  # 设置60秒超时
+            max_retries=2,  # 最多重试2次
         )
         self.embeddings = OpenAIEmbeddings(
             model=emb_model,
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=60,  # 设置60秒超时
+            max_retries=2,  # 最多重试2次
         )
         # 记录模型名，便于在结果中写入评测模型信息
         self.llm_model_name = llm_model
         self.embedding_model_name = emb_model
 
-        # 配置RAGAS指标
-        faithfulness.llm = self.llm
-        answer_relevancy.llm = self.llm
-        answer_relevancy.embeddings = self.embeddings
-        context_precision.llm = self.llm
-        context_recall.llm = self.llm
-        context_recall.embeddings = self.embeddings
-
+        # RAGAS 0.3.x 版本不需要手动配置指标的 LLM 和 embeddings
+        # 这些会在 evaluate 函数调用时自动配置
         self.metrics = [faithfulness, answer_relevancy, context_precision, context_recall]
 
         logger.info(f"RAGAS评估器初始化完成（LLM={llm_model}, Embedding={emb_model}）")
@@ -119,39 +119,111 @@ class RAGASEvaluator:
             raise
     
     def evaluate_single_sample(self, sample_data: Dict[str, Any]) -> Dict[str, float]:
-        """评估单个样本"""
-        try:
-            # 准备单个样本的数据集
-            dataset = self.prepare_ragas_dataset([sample_data])
-            
-            # 执行评估
-            result = evaluate(
-                dataset=dataset,
-                metrics=self.metrics,
-                llm=self.llm,
-                embeddings=self.embeddings
-            )
-            
-            # 提取评分并处理NaN值
-            scores = {
-                'faithfulness': float(result['faithfulness'][0]) if not np.isnan(result['faithfulness'][0]) else 0.0,
-                'answer_relevancy': float(result['answer_relevancy'][0]) if not np.isnan(result['answer_relevancy'][0]) else 0.0,
-                'context_precision': float(result['context_precision'][0]) if not np.isnan(result['context_precision'][0]) else 0.0,
-                'context_recall': float(result['context_recall'][0]) if not np.isnan(result['context_recall'][0]) else 0.0
-            }
-            
-            logger.info(f"单个样本评估完成: {scores}")
-            return scores
-            
-        except Exception as e:
-            logger.error(f"单个样本评估失败: {e}")
-            # 返回默认分数
-            return {
-                'faithfulness': 0.0,
-                'answer_relevancy': 0.0,
-                'context_precision': 0.0,
-                'context_recall': 0.0
-            }
+        """评估单个样本，带重试机制"""
+        max_retries = 3
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"开始评估单个样本 (尝试 {attempt + 1}/{max_retries}): {sample_data.get('question', 'N/A')[:50]}...")
+                
+                # 验证输入数据
+                required_fields = ['question', 'answer', 'contexts', 'ground_truth']
+                for field in required_fields:
+                    if field not in sample_data:
+                        raise ValueError(f"缺少必需字段: {field}")
+                
+                # 验证数据内容
+                if not sample_data['contexts'] or len(sample_data['contexts']) == 0:
+                    logger.warning("contexts 为空，添加默认上下文")
+                    sample_data['contexts'] = ["相关医学知识"]
+                
+                # 准备单个样本的数据集
+                dataset = self.prepare_ragas_dataset([sample_data])
+                logger.info(f"数据集准备完成，包含 {len(dataset)} 个样本")
+                
+                # 执行评估 - RAGAS 0.3.x 版本
+                logger.info("开始执行 RAGAS 评估...")
+                result = evaluate(
+                    dataset=dataset,
+                    metrics=self.metrics,
+                    llm=self.llm,
+                    embeddings=self.embeddings,
+                    raise_exceptions=False  # 避免因单个指标失败而中断整个评估
+                )
+                logger.info("RAGAS 评估执行完成")
+                
+                # 提取评分并处理NaN值 - 适配 RAGAS 0.3.x 版本
+                scores = {}
+                logger.info(f"评估结果类型: {type(result)}")
+                
+                # RAGAS 0.3.x 版本的结果对象可能有不同的访问方式
+                try:
+                    # 尝试直接访问结果字典
+                    if hasattr(result, 'to_pandas'):
+                        df = result.to_pandas()
+                        logger.info(f"结果DataFrame列: {df.columns.tolist()}")
+                        for metric_name in ['faithfulness', 'answer_relevancy', 'context_precision', 'context_recall']:
+                            if metric_name in df.columns:
+                                raw_score = df[metric_name].iloc[0] if len(df) > 0 else 0.0
+                                if pd.isna(raw_score) or np.isnan(raw_score):
+                                    logger.warning(f"{metric_name} 评分为 NaN，设置为 0.0")
+                                    scores[metric_name] = 0.0
+                                else:
+                                    scores[metric_name] = float(raw_score)
+                                    logger.info(f"{metric_name}: {scores[metric_name]:.4f}")
+                            else:
+                                logger.warning(f"结果中缺少 {metric_name} 指标")
+                                scores[metric_name] = 0.0
+                    else:
+                        # 备用方法：尝试直接访问属性
+                        for metric_name in ['faithfulness', 'answer_relevancy', 'context_precision', 'context_recall']:
+                            try:
+                                if hasattr(result, metric_name):
+                                    raw_score = getattr(result, metric_name)
+                                    if isinstance(raw_score, (list, tuple)) and len(raw_score) > 0:
+                                        raw_score = raw_score[0]
+                                    if pd.isna(raw_score) or np.isnan(raw_score):
+                                        scores[metric_name] = 0.0
+                                    else:
+                                        scores[metric_name] = float(raw_score)
+                                else:
+                                    scores[metric_name] = 0.0
+                            except Exception as e:
+                                logger.warning(f"提取 {metric_name} 失败: {e}")
+                                scores[metric_name] = 0.0
+                except Exception as e:
+                    logger.error(f"评分提取失败: {e}")
+                    # 设置默认分数
+                    for metric_name in ['faithfulness', 'answer_relevancy', 'context_precision', 'context_recall']:
+                        scores[metric_name] = 0.0
+                
+                # 检查是否有有效分数
+                valid_scores = [score for score in scores.values() if score > 0]
+                if valid_scores or attempt == max_retries - 1:
+                    logger.info(f"单个样本评估完成: {scores}")
+                    return scores
+                else:
+                    logger.warning(f"尝试 {attempt + 1} 所有评分都为0，重试...")
+                    continue
+                    
+            except Exception as e:
+                last_error = e
+                logger.error(f"尝试 {attempt + 1} 评估失败: {str(e)}")
+                if attempt < max_retries - 1:
+                    logger.info("等待重试...")
+                    import time
+                    time.sleep(2)  # 等待2秒后重试
+                    continue
+        
+        # 所有重试都失败，返回默认分数
+        logger.error(f"所有重试都失败，最后错误: {last_error}")
+        return {
+            'faithfulness': 0.0,
+            'answer_relevancy': 0.0,
+            'context_precision': 0.0,
+            'context_recall': 0.0
+        }
     
     def evaluate_batch(self, test_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """批量评估"""

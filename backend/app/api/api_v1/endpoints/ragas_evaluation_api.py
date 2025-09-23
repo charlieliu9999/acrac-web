@@ -8,6 +8,8 @@ import os
 import json
 import time
 import logging
+import asyncio
+import sys
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel
@@ -17,6 +19,14 @@ from sqlalchemy import Column, Integer, String, Text, JSON, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import json
+
+# 修复 RAGAS 与 uvloop 的兼容性问题
+if sys.platform != 'win32':
+    try:
+        # 设置默认事件循环策略，避免与 uvloop 冲突
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+    except Exception:
+        pass
 
 # RAGAS相关导入
 try:
@@ -63,31 +73,20 @@ class RAGASEvaluationService:
     """RAGAS评估服务 - 基于official_ragas_evaluation.py"""
     
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        # 兼容旧逻辑：优先 OPENAI_API_KEY，否则使用 SILICONFLOW_API_KEY
+        self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("SILICONFLOW_API_KEY")
         if not self.api_key:
-            logger.warning("未设置OPENAI_API_KEY环境变量")
-    
-    def setup_models(self, model_name: str = "gpt-3.5-turbo", base_url: str = "https://api.siliconflow.cn/v1"):
-        """设置LLM和Embeddings模型"""
-        if not self.api_key:
-            raise ValueError("需要设置OPENAI_API_KEY环境变量")
-        
+            logger.warning("未设置 OPENAI_API_KEY 或 SILICONFLOW_API_KEY 环境变量")
+
+    def setup_models(self, model_name: str = None, base_url: str = None):
+        """设置LLM和Embeddings模型（统一走模型配置的 evaluation 上下文）"""
         try:
-            # 初始化LLM
-            llm = ChatOpenAI(
-                model=model_name,
-                api_key=self.api_key,
-                base_url=base_url,
-                temperature=0
-            )
-            
-            # 初始化Embeddings
-            embeddings = OpenAIEmbeddings(
-                model="text-embedding-ada-002",
-                api_key=self.api_key,
-                base_url=base_url
-            )
-            
+            # 使用统一评测适配器，从 backend/config/model_contexts.json 的 contexts.evaluation 读取
+            from app.services.ragas_evaluator import RAGASEvaluator
+            evaluator = RAGASEvaluator()
+            llm = evaluator.llm
+            embeddings = evaluator.embeddings
+            logger.info(f"RAGAS评估模型: LLM={evaluator.llm_model_name}, Embedding={evaluator.embedding_model_name}")
             return llm, embeddings
         except Exception as e:
             logger.error(f"模型初始化失败: {e}")

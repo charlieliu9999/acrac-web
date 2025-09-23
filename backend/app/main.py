@@ -1,3 +1,15 @@
+import asyncio
+import sys
+
+# 修复 RAGAS 与 uvloop 的兼容性问题
+if sys.platform != 'win32':
+    try:
+        import uvloop
+        # 如果使用 uvloop，需要设置正确的事件循环策略
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+    except ImportError:
+        pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware

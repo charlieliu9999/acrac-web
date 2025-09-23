@@ -27,6 +27,7 @@ class InferenceLog(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    project_id = Column(String(50), nullable=True, comment="项目ID，用于关联Excel评测任务")
     query_text = Column(Text, nullable=False, comment="查询文本")
     query_language = Column(String(10), default="zh", comment="查询语言")
     inference_method = Column(String(50), comment="推理方法: rag, rule_based, case_voting")
@@ -92,11 +93,34 @@ class DataImportTask(Base):
     def __repr__(self):
         return f"<DataImportTask(id={self.id}, filename='{self.filename}', status='{self.status}')>"
 
+class EvaluationProject(Base):
+    """评测项目表"""
+    __tablename__ = "evaluation_projects"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(String(50), unique=True, nullable=False, comment="项目唯一标识符")
+    project_name = Column(String(255), nullable=False, comment="项目名称")
+    description = Column(Text, comment="项目描述")
+    excel_filename = Column(String(255), nullable=False, comment="Excel文件名")
+    total_questions = Column(Integer, default=0, comment="总问题数")
+    processed_questions = Column(Integer, default=0, comment="已处理问题数")
+    status = Column(String(50), default="created", comment="状态: created, processing, completed, failed")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    creator = relationship("User")
+    
+    def __repr__(self):
+        return f"<EvaluationProject(id={self.id}, project_id='{self.project_id}', status='{self.status}')>"
+
 class ExcelEvaluationData(Base):
     """Excel评测数据表"""
     __tablename__ = "excel_evaluation_data"
     
     id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(String(50), ForeignKey("evaluation_projects.project_id"), nullable=False, comment="关联的评测项目ID")
     task_id = Column(String(50), nullable=False, comment="评测任务ID")
     filename = Column(String(255), nullable=False, comment="Excel文件名")
     question = Column(Text, nullable=False, comment="问题")
@@ -118,5 +142,8 @@ class ExcelEvaluationData(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     
+    # Relationships
+    project = relationship("EvaluationProject")
+    
     def __repr__(self):
-        return f"<ExcelEvaluationData(id={self.id}, task_id='{self.task_id}', status='{self.status}')>"
+        return f"<ExcelEvaluationData(id={self.id}, project_id='{self.project_id}', task_id='{self.task_id}', status='{self.status}')>"

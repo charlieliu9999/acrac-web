@@ -7,7 +7,7 @@ import DataBrowser from './pages/DataBrowser'
 import Tools from './pages/Tools'
 import DataImport from './pages/DataImport'
 import ModelConfig from './pages/ModelConfig'
-import RAGEvaluation from './pages/RAGEvaluation'
+import RAGASEvalV2 from './pages/RAGASEvalV2'
 import RunLogs from './pages/RunLogs'
 import { api } from './api/http'
 
@@ -145,7 +145,7 @@ function App() {
           <div style={{ padding: 16, minHeight: 360, background: colorBgContainer }}>
             <Routes>
               <Route path="/" element={<RAGAssistant />} />
-              <Route path="/evaluation" element={<RAGEvaluation />} />
+              <Route path="/evaluation" element={<RAGASEvalV2 />} />
               <Route path="/rules" element={<RulesManager />} />
               <Route path="/data" element={<DataBrowser />} />
               <Route path="/tools" element={<Tools />} />

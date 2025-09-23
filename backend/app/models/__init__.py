@@ -4,7 +4,7 @@ from .acrac_models import (
     VectorSearchLog, DataUpdateHistory
 )
 from .system_models import (
-    User, InferenceLog, Rule, DataImportTask, ExcelEvaluationData
+    User, InferenceLog, Rule, DataImportTask, EvaluationProject, ExcelEvaluationData
 )
 from .ragas_models import (
     EvaluationTask, ScenarioResult, EvaluationMetrics, DataAdapterLog, TaskStatus
@@ -18,7 +18,7 @@ __all__ = [
     "Panel", "Topic", "ClinicalScenario", "ProcedureDictionary", "ClinicalRecommendation",
     "VectorSearchLog", "DataUpdateHistory",
     # System Models
-    "User", "InferenceLog", "Rule", "DataImportTask", "ExcelEvaluationData",
+    "User", "InferenceLog", "Rule", "DataImportTask", "EvaluationProject", "ExcelEvaluationData",
     # RAGAS Models
     "EvaluationTask", "ScenarioResult", "EvaluationMetrics", "DataAdapterLog", "TaskStatus",
     # Clinical Data Models
