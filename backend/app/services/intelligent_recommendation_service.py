@@ -669,11 +669,15 @@ class IntelligentRecommendationService:
     def _generate_query_vector(self, query_text: str) -> List[float]:
         """生成查询向量"""
         try:
+            # 从配置文件动态获取嵌入模型
+            import os
+            embedding_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "bge-m3:latest")
+            
             # 使用Ollama生成向量
             response = requests.post(
                 "http://localhost:11434/api/embeddings",
                 json={
-                    "model": "bge-m3:latest",  # 使用BGE-M3嵌入模型
+                    "model": embedding_model,  # 使用配置的嵌入模型
                     "prompt": query_text
                 },
                 timeout=30

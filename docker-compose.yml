@@ -3,6 +3,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg15
     container_name: acrac_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -24,6 +25,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: acrac_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -42,7 +44,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE:-python:3.10-slim}
     container_name: acrac_backend
+    restart: unless-stopped
     volumes:
       - ./backend:/app
       - backend_logs:/app/logs
@@ -56,7 +61,8 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/acrac/health"]
+      # 使用轻量健康检查端点，避免依赖数据库状态导致误报
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -67,7 +73,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        PY_BASE_IMAGE: ${PY_BASE_IMAGE:-python:3.10-slim}
     container_name: acrac_celery_worker
+    restart: unless-stopped
     command: celery -A app.celery_app worker --loglevel=info --queues=ragas_queue
     volumes:
       - ./backend:/app
@@ -110,6 +119,7 @@ services:
       context: .
       dockerfile: deployment/nginx/Dockerfile
     container_name: acrac_nginx
+    restart: unless-stopped
     ports:
       - "5173:5173"
       - "8080:80"

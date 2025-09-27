@@ -1,20 +1,23 @@
 """
-Ollama Qwen3:30b 集成服务
+Ollama Qwen 集成服务
 """
 import requests
 import json
 import time
 import logging
+import os
 from typing import Dict, Any, List, Optional
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class OllamaQwenService:
-    """Ollama Qwen3:30b 服务"""
+    """Ollama Qwen 服务"""
     
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: Optional[str] = None):
         self.base_url = base_url
-        self.model = "qwen3:30b"  # 使用可用的qwen3:30b模型
+        # 从配置文件或环境变量动态加载模型名称
+        self.model = model or os.getenv("OLLAMA_LLM_MODEL") or getattr(settings, "OLLAMA_LLM_MODEL", "qwen3:30b")
         
     def check_availability(self) -> bool:
         """检查Ollama服务是否可用"""

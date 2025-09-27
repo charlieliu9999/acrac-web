@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { api } from '../api/http'
-import { Button, Card, Col, Descriptions, Divider, Form, Input, InputNumber, message, Progress, Row, Space, Switch, Tabs, Table, Tag, Upload, Modal, DatePicker, Select, Popconfirm } from 'antd'
+import { Button, Card, Col, Descriptions, Divider, Form, Input, InputNumber, message, Progress, Row, Space, Switch, Tabs, Table, Tag, Upload, Modal, DatePicker, Select, Popconfirm, Spin } from 'antd'
 import type { UploadProps } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -15,7 +15,10 @@ interface EvalResultItem {
   question_id: string
   clinical_query: string
   ground_truth?: string
+  rag_answer?: string
+  contexts?: string[]
   ragas_scores?: any
+  evaluation_details?: any
   status?: string
 }
 interface RunLogItem {
@@ -51,8 +54,11 @@ const RAGASEvalV2: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [inferLoading, setInferLoading] = useState(false)
   const [inferProgress, setInferProgress] = useState({ current: 0, total: 0 })
+  // 检索/候选配置，与RAG助手保持一致
+  const [topScenarios, setTopScenarios] = useState<number>(Number(localStorage.getItem('rag.topScenarios') || 3))
+  const [topRecsPerScenario, setTopRecsPerScenario] = useState<number>(Number(localStorage.getItem('rag.topRecs') || 3))
+  const [simThreshold, setSimThreshold] = useState<number>(Number(localStorage.getItem('rag.simThreshold') || 0.6))
   const [evalLoading, setEvalLoading] = useState(false)
-  const [ragasTaskId, setRagasTaskId] = useState<string | null>(null)
   const [evalTasks, setEvalTasks] = useState<EvalTaskItem[]>([])
   const [evalTasksLoading, setEvalTasksLoading] = useState<boolean>(false)
   const [evalTaskDetail, setEvalTaskDetail] = useState<any>(null)
@@ -62,11 +68,14 @@ const RAGASEvalV2: React.FC = () => {
   const [runDetailOpen, setRunDetailOpen] = useState<boolean>(false)
   const [runDetail, setRunDetail] = useState<any>(null)
   const [runDetailId, setRunDetailId] = useState<number | null>(null)
+  const [runDetailCache, setRunDetailCache] = useState<Record<number, any>>({})
 
   const [ragasProgress, setRagasProgress] = useState({ current: 0, total: 0 })
   const [ragasSummary, setRagasSummary] = useState<any>(null)
   const [ragasResults, setRagasResults] = useState<EvalResultItem[]>([])
-  const pollingTimer = useRef<any>(null)
+
+  // 评测数据处理相关状态
+  // 已弃用：评测数据处理预览
 
   const handleExcelUpload: UploadProps['customRequest'] = async (options) => {
     const { file, onSuccess, onError } = options
@@ -104,6 +113,12 @@ const RAGASEvalV2: React.FC = () => {
     { title: 'ID', dataIndex: 'question_id', width: 120 },
     { title: '临床场景', dataIndex: 'clinical_query', ellipsis: true },
     { title: '标准答案', dataIndex: 'ground_truth', width: 240, ellipsis: true },
+    { title: '模型', width: 200, render: (_:any, r) => (r as any)?.evaluation_details?.ragas_llm_model 
+        || (r as any)?.metadata?.ragas_details?.ragas_llm_model 
+        || (r as any)?.metadata?.ragas_llm_model 
+        || (r as any)?.evaluation_details?.model 
+        || 'unknown' },
+    { title: '输出预览', dataIndex: 'rag_answer', width: 240, ellipsis: true },
     { title: 'Faithfulness', dataIndex: ['ragas_scores', 'faithfulness'], width: 130,
       render: (_:any, r) => {
         const v = r?.ragas_scores?.faithfulness
@@ -130,6 +145,54 @@ const RAGASEvalV2: React.FC = () => {
       }
     },
   ]
+
+  // 离线评测详细渲染（输入/GT/输出/模型/上下文/细节）
+  const renderEvalDetail = (r: EvalResultItem) => {
+    const details = (r as any)?.evaluation_details || (r as any)?.metadata?.ragas_details || (r as any)?.metadata || {}
+    const model = details?.ragas_llm_model || details?.model || 'unknown'
+    const embedModel = details?.ragas_embedding_model || details?.embedding_model
+    return (
+      <div style={{ background: '#fafafa', padding: 12, borderRadius: 6 }}>
+        <Descriptions size='small' column={1} bordered>
+          <Descriptions.Item label='输入（question）'>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{r?.clinical_query || ''}</div>
+          </Descriptions.Item>
+          <Descriptions.Item label='标准答案（ground_truth）'>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{r?.ground_truth || ''}</div>
+          </Descriptions.Item>
+          <Descriptions.Item label='输出（rag_answer）'>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{r?.rag_answer || ''}</div>
+          </Descriptions.Item>
+          <Descriptions.Item label='使用的模型'>
+            <div>{model}{embedModel ? ` · ${embedModel}` : ''}</div>
+          </Descriptions.Item>
+          <Descriptions.Item label='评测方式'>
+            <div>{details?.method || 'ragas_v2'}</div>
+          </Descriptions.Item>
+        </Descriptions>
+        {Array.isArray(r?.contexts) && r.contexts.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>上下文（contexts）</div>
+            {r.contexts.map((c, i) => (
+              <div key={i} style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, marginBottom: 6, fontSize: 12 }}>
+                <b>#{i+1}</b> {c}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>评分（ragas_scores）</div>
+          <pre className='mono' style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(r?.ragas_scores || {}, null, 2)}</pre>
+        </div>
+        {Object.keys(details).length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>评测细节（evaluation_details）</div>
+            <pre className='mono' style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(details, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    )
+  }
 
 
   const mappedSelection = useMemo(() => {
@@ -173,10 +236,10 @@ const RAGASEvalV2: React.FC = () => {
         const t0 = Date.now()
         const resp = await api.post('/api/v1/acrac/rag-llm/intelligent-recommendation', {
           clinical_query: q,
-          top_scenarios: 3,
-          top_recommendations_per_scenario: 3,
+          top_scenarios: topScenarios,
+          top_recommendations_per_scenario: topRecsPerScenario,
           show_reasoning: true,
-          similarity_threshold: 0.6,
+          similarity_threshold: simThreshold,
           debug_mode: true,
           include_raw_data: true,
           compute_ragas: false,
@@ -232,11 +295,168 @@ const RAGASEvalV2: React.FC = () => {
     try {
       const r = await api.get(`/api/v1/acrac/rag-llm/runs/${id}`)
       setRunDetail(r.data || r)
+      setRunDetailCache((prev) => ({ ...prev, [id]: (r.data || r) }))
     } catch (e:any) {
       // 若后端无详情接口，回退到列表项本身
       setRunDetail(record)
-      message.warn('后端未提供推理详情接口，已显示列表项内容')
+      message.warning('后端未提供推理详情接口，已显示列表项内容')
     }
+  }
+
+  const ensureRunDetail = async (record: RunLogItem) => {
+    if (!record?.id) return
+    if (runDetailCache[record.id]) return
+    try {
+      const r = await api.get(`/api/v1/acrac/rag-llm/runs/${record.id}`)
+      setRunDetailCache((prev) => ({ ...prev, [record.id]: (r.data || r) }))
+    } catch (e:any) {
+      // 忽略错误，使用列表项信息兜底
+      setRunDetailCache((prev) => ({ ...prev, [record.id]: record }))
+    }
+  }
+
+  // 渲染处理后的评测数据
+  // 已弃用：renderProcessedData
+
+  // 渲染推理详情的结构化内容
+  const renderRunDetailContent = (detail: any) => {
+    if (!detail) return <div>暂无数据</div>
+
+    const result = detail.result || detail
+    
+    return (
+      <div style={{ maxHeight: 500, overflow: 'auto' }}>
+        <Descriptions title="基本信息" bordered size="small" column={2}>
+          <Descriptions.Item label="查询ID">{detail.id}</Descriptions.Item>
+          <Descriptions.Item label="查询文本">{detail.query_text}</Descriptions.Item>
+          <Descriptions.Item label="推理方法">{detail.inference_method}</Descriptions.Item>
+          <Descriptions.Item label="执行状态">{detail.success ? '成功' : '失败'}</Descriptions.Item>
+          <Descriptions.Item label="执行时间">{detail.execution_time_ms}ms</Descriptions.Item>
+          <Descriptions.Item label="创建时间">{detail.created_at}</Descriptions.Item>
+        </Descriptions>
+
+        {detail.error_message && (
+          <div style={{ marginTop: 16 }}>
+            <h4>错误信息</h4>
+            <div style={{ color: 'red', background: '#fff2f0', padding: 8, borderRadius: 4 }}>
+              {detail.error_message}
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: 16 }}>
+            <h4>推理结果</h4>
+            
+            {/* LLM推荐结果 */}
+            {result.llm_recommendations && (
+              <div style={{ marginBottom: 16 }}>
+                <h5>LLM推荐</h5>
+                <div style={{ background: '#f6ffed', padding: 12, borderRadius: 4, border: '1px solid #b7eb8f' }}>
+                  <div><strong>推荐内容：</strong></div>
+                  <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                    {typeof result.llm_recommendations === 'string' 
+                      ? result.llm_recommendations 
+                      : JSON.stringify(result.llm_recommendations, null, 2)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 检索场景 */}
+            {result.scenarios && result.scenarios.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <h5>检索场景 ({result.scenarios.length}个)</h5>
+                {result.scenarios.map((scenario: any, idx: number) => (
+                  <div key={idx} style={{ 
+                    background: '#f0f2f5', 
+                    padding: 12, 
+                    marginBottom: 8, 
+                    borderRadius: 4,
+                    border: '1px solid #d9d9d9'
+                  }}>
+                    <div><strong>场景 {idx + 1}:</strong> {scenario.scenario_name || scenario.name}</div>
+                    {scenario.similarity_score && (
+                      <div><strong>相似度:</strong> {(scenario.similarity_score * 100).toFixed(2)}%</div>
+                    )}
+                    {scenario.description && (
+                      <div style={{ marginTop: 4 }}>
+                        <strong>描述:</strong> {scenario.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 上下文信息 */}
+            {result.contexts && result.contexts.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <h5>检索上下文 ({result.contexts.length}个)</h5>
+                {result.contexts.map((context: string, idx: number) => (
+                  <div key={idx} style={{ 
+                    background: '#fff7e6', 
+                    padding: 8, 
+                    marginBottom: 4, 
+                    borderRadius: 4,
+                    border: '1px solid #ffd591'
+                  }}>
+                    <strong>上下文 {idx + 1}:</strong> {context.substring(0, 200)}
+                    {context.length > 200 && '...'}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 模型信息 */}
+            <div style={{ marginBottom: 16 }}>
+              <h5>模型信息</h5>
+              <Descriptions size="small" column={1}>
+                {result.model_used && <Descriptions.Item label="LLM模型">{result.model_used}</Descriptions.Item>}
+                {result.embedding_model_used && <Descriptions.Item label="嵌入模型">{result.embedding_model_used}</Descriptions.Item>}
+                {result.reranker_model_used && <Descriptions.Item label="重排模型">{result.reranker_model_used}</Descriptions.Item>}
+                {result.similarity_threshold && <Descriptions.Item label="相似度阈值">{result.similarity_threshold}</Descriptions.Item>}
+                {result.max_similarity && <Descriptions.Item label="最大相似度">{(result.max_similarity * 100).toFixed(2)}%</Descriptions.Item>}
+                {result.processing_time_ms && <Descriptions.Item label="处理时间">{result.processing_time_ms}ms</Descriptions.Item>}
+              </Descriptions>
+            </div>
+
+            {/* 调试信息 */}
+            {result.debug_info && (
+              <div style={{ marginBottom: 16 }}>
+                <h5>调试信息</h5>
+                <pre style={{ 
+                  background: '#f5f5f5', 
+                  padding: 8, 
+                  borderRadius: 4, 
+                  fontSize: '12px',
+                  maxHeight: 200,
+                  overflow: 'auto'
+                }}>
+                  {JSON.stringify(result.debug_info, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* 原始数据 */}
+            <div>
+              <h5>完整原始数据</h5>
+              <pre style={{ 
+                background: '#fafafa', 
+                padding: 8, 
+                borderRadius: 4, 
+                fontSize: '11px',
+                maxHeight: 300,
+                overflow: 'auto',
+                border: '1px solid #e8e8e8'
+              }}>
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   const runsColumnsWithOps: ColumnsType<RunLogItem> = useMemo(() => {
@@ -252,10 +472,14 @@ const RAGASEvalV2: React.FC = () => {
     await loadRunsWithFilters()
   }
 
+  // 评测数据处理函数
+  // 已弃用：processEvaluationData
+
   const offlineEvaluateSelectedRuns = async () => {
-    if (!runsSelectedKeys.length) return message.warning('请先在推理历史中勾选需要评测的记录')
+    if (!runsSelectedKeys.length) return message.warning('请先选择要评测的推理记录')
+    
     try {
-      // 构建 run_id -> ground_truth 映射（尽量从当前数据预览中匹配）
+      // 构建 run_id -> ground_truth 映射
       const gtMap: Record<number, string> = {}
       const runIdToQuery: Record<number, string> = {}
       runs.filter(r => runsSelectedKeys.includes(r.id)).forEach(r => { runIdToQuery[r.id] = r.query_text })
@@ -263,21 +487,17 @@ const RAGASEvalV2: React.FC = () => {
         const match = Object.entries(runIdToQuery).find(([id, q]) => q === tc.clinical_query)
         if (match && tc.ground_truth) gtMap[Number(match[0])] = tc.ground_truth
       })
+
+      // 调用RAGAS离线评测API
       const resp = await api.post('/api/v1/ragas/offline-evaluate', {
         run_ids: runsSelectedKeys,
         ground_truths: gtMap,
         async_mode: false
       })
-      if (resp.data?.task_id) {
-        setRagasTaskId(resp.data.task_id)
-        setRagasResults(resp.data?.results || [])
-        setRagasSummary(resp.data?.summary || null)
-        message.success('已完成离线评测（基于历史推理）')
-      } else {
-        message.success('已完成离线评测（基于历史推理）')
-        setRagasResults(resp.data?.results || [])
-        setRagasSummary(resp.data?.summary || null)
-      }
+      
+      setRagasResults(resp.data?.results || [])
+      setRagasSummary(resp.data?.summary || null)
+      message.success(`已完成离线评测，共评测${runsSelectedKeys.length}条记录`)
     } catch (e:any) {
       message.error('离线评测失败：' + (e?.response?.data?.detail || e.message))
     }
@@ -295,28 +515,7 @@ const RAGASEvalV2: React.FC = () => {
     }
   }
 
-  const loadFullRagasResults = async () => {
-    if (!ragasTaskId) return
-    try {
-      const r = await api.get(`/api/v1/ragas/history/${ragasTaskId}`)
-      const results = (r.data?.results || r.data?.scenarios || []).map((it:any) => ({
-        question_id: String(it.question_id ?? it.id ?? ''),
-        clinical_query: it.clinical_query ?? it.question ?? '',
-        ground_truth: it.ground_truth ?? '',
-        ragas_scores: it.ragas_scores ?? {
-          faithfulness: it.faithfulness,
-          answer_relevancy: it.answer_relevancy,
-          context_precision: it.context_precision,
-          context_recall: it.context_recall,
-        }
-      }))
-      setRagasResults(results)
-      setRagasSummary(r.data?.metrics || r.data?.summary || r.data)
-      message.success('已加载完整评测结果')
-    } catch (e:any) {
-      message.error('加载完整评测结果失败：' + (e?.response?.data?.detail || e.message))
-    }
-  }
+  // 移除loadFullRagasResults函数，因为改为同步模式
 
   const evalTasksColumns: ColumnsType<EvalTaskItem> = [
     { title: '任务ID', dataIndex: 'task_id', width: 220 },
@@ -363,45 +562,30 @@ const RAGASEvalV2: React.FC = () => {
         clinical_query: (tc as any).clinical_query,
         ground_truth: (tc as any).ground_truth,
       }))
-      const response = await api.post('/api/v1/ragas/evaluate', {
-        test_cases: mappedCases,
-        async_mode: true,
-        // 预留：将来改为 use_history: true 直接从历史推理结果取 answer/contexts
+      // 初始化同步评测进度（总数）
+      setRagasProgress({ current: 0, total: mappedCases.length })
+      // 使用同步的RAGAS评测API
+      const response = await api.post('/api/v1/ragas-standalone/evaluate', {
+        test_data: mappedCases
       })
-      if (response.data?.task_id) {
-        setRagasTaskId(response.data.task_id)
-        message.success('离线评测任务已启动')
-        startPolling(response.data.task_id)
+      
+      if (response.data?.status === 'success') {
+        const results = response.data.results
+        setRagasResults(results?.detailed_results || [])
+        setRagasSummary(results?.summary || {})
+        setRagasProgress({ current: mappedCases.length, total: mappedCases.length })
+        message.success('RAGAS评测完成！')
       } else {
-        message.error('启动离线评测失败')
+        message.error(`RAGAS评测失败: ${response.data?.error || '未知错误'}`)
       }
     } catch (e: any) {
-      message.error('启动离线评测失败：' + (e?.response?.data?.detail || e.message))
+      message.error('RAGAS评测失败：' + (e?.response?.data?.detail || e.message))
     } finally {
       setEvalLoading(false)
     }
   }
 
-  const startPolling = (taskId: string) => {
-    if (pollingTimer.current) clearInterval(pollingTimer.current)
-    pollingTimer.current = setInterval(async () => {
-      try {
-        const r = await api.get(`/api/v1/ragas/evaluate/${taskId}/status`)
-        const status = r.data || {}
-        const processed = status.processed_cases ?? ((status.completed_cases || 0) + (status.failed_cases || 0))
-        const total = status.total_cases || 0
-        setRagasProgress({ current: processed, total })
-        if (status?.recent_results) setRagasResults(status.recent_results)
-        if (status.status === 'completed' || processed >= total) {
-          clearInterval(pollingTimer.current)
-          const s = await api.get(`/api/v1/ragas/evaluate/${taskId}/summary`)
-          setRagasSummary(s.data)
-          await loadFullRagasResults()
-          message.success('离线RAGAS评测已完成，已加载完整结果')
-        }
-      } catch {}
-    }, 1500)
-  }
+  // 移除轮询函数，因为改为同步模式
 
   const dataSource = useMemo(() => excelTestCases.map((tc, i) => ({ key: i, ...tc })), [excelTestCases])
 
@@ -448,7 +632,10 @@ const RAGASEvalV2: React.FC = () => {
             children: (
               <Card>
                 <Space direction='vertical' style={{ width: '100%' }}>
-                  <Space>
+                  <Space wrap>
+                    <InputNumber min={1} max={10} value={topScenarios} onChange={(v)=>{ const n=Number(v||3); setTopScenarios(n); localStorage.setItem('rag.topScenarios', String(n)) }} addonBefore='检索场景数' />
+                    <InputNumber min={1} max={10} value={topRecsPerScenario} onChange={(v)=>{ const n=Number(v||3); setTopRecsPerScenario(n); localStorage.setItem('rag.topRecs', String(n)) }} addonBefore='每场景候选数' />
+                    <InputNumber min={0} max={1} step={0.05} value={simThreshold} onChange={(v)=>{ const n=Number(v||0.6); setSimThreshold(n); localStorage.setItem('rag.simThreshold', String(n)) }} addonBefore='相似度阈值' />
                     <Button type='primary' onClick={runBatchInference} loading={inferLoading}>
                       开始批量推理（仅推理，不评测）
                     </Button>
@@ -472,9 +659,11 @@ const RAGASEvalV2: React.FC = () => {
                   <Space>
                     <Button type='primary' onClick={startOfflineEvaluation} loading={evalLoading}>开始离线评测</Button>
                     {ragasProgress.total > 0 && (
-                      <span>进度：{ragasProgress.current}/{ragasProgress.total}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {evalLoading && <Spin size='small' />}
+                        <span>进度：{ragasProgress.current}/{ragasProgress.total}</span>
+                      </div>
                     )}
-                    {ragasTaskId && <Tag color='processing'>任务ID：{ragasTaskId}</Tag>}
                   </Space>
                   <Divider />
                   <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -505,26 +694,56 @@ const RAGASEvalV2: React.FC = () => {
                     rowKey='id'
                     rowSelection={runsRowSelection}
                     columns={runsColumnsWithOps}
+                    expandable={{
+                      expandedRowRender: (record) => renderRunDetailContent(runDetailCache[(record as any).id] || record),
+                      onExpand: (expanded, record) => { if (expanded) ensureRunDetail(record as RunLogItem) }
+                    }}
                     dataSource={runs}
                     pagination={{ pageSize: 10 }}
                     style={{ marginTop: 12 }}
                   />
 
                   {ragasProgress.total > 0 && (
-                    <Progress percent={Math.round((ragasProgress.current / Math.max(ragasProgress.total, 1)) * 100)} />
+                    <Progress 
+                      status={evalLoading ? 'active' : undefined}
+                      percent={Math.round((ragasProgress.current / Math.max(ragasProgress.total, 1)) * 100)} 
+                      format={(p)=>`${ragasProgress.current}/${ragasProgress.total} · ${p}%`} 
+                    />
                   )}
                   {ragasSummary && (
-                    <pre className='mono' style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(ragasSummary, null, 2)}</pre>
+                    <>
+                      <Card size='small' title='评测汇总（可视化）' style={{ marginBottom: 8 }}>
+                        <Row gutter={12}>
+                          <Col span={12}>
+                            <div style={{ marginBottom: 8 }}>Faithfulness</div>
+                            <Progress percent={Math.round((ragasSummary?.faithfulness || 0) * 100)} />
+                            <div style={{ margin: '12px 0 8px' }}>Answer Relevancy</div>
+                            <Progress percent={Math.round((ragasSummary?.answer_relevancy || 0) * 100)} />
+                          </Col>
+                          <Col span={12}>
+                            <div style={{ marginBottom: 8 }}>Context Precision</div>
+                            <Progress percent={Math.round((ragasSummary?.context_precision || 0) * 100)} />
+                            <div style={{ margin: '12px 0 8px' }}>Context Recall</div>
+                            <Progress percent={Math.round((ragasSummary?.context_recall || 0) * 100)} />
+                          </Col>
+                        </Row>
+                        <div style={{ marginTop: 8, color: '#999' }}>
+                          统计：{ragasSummary?.completed ?? 0}/{ragasSummary?.total ?? 0} 完成 · 失败 {ragasSummary?.failed ?? 0}
+                        </div>
+                        <div style={{ marginTop: 4 }}>
+                          使用模型：{(ragasResults?.[0]?.evaluation_details?.ragas_llm_model) || 'unknown'}
+                        </div>
+                      </Card>
+                      <pre className='mono' style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(ragasSummary, null, 2)}</pre>
+                    </>
                   )}
                   <Divider />
-                  <Space>
-                    <Button onClick={loadFullRagasResults} disabled={!ragasTaskId}>加载完整结果</Button>
-                  </Space>
                   <Table
                     size='small'
                     rowKey='question_id'
                     columns={ragasColumns}
                     dataSource={ragasResults}
+                    expandable={{ expandedRowRender: (r) => renderEvalDetail(r as EvalResultItem) }}
                     pagination={{ pageSize: 10 }}
                     style={{ marginTop: 12 }}
                   />
@@ -585,7 +804,6 @@ const RAGASEvalV2: React.FC = () => {
                         render: (_: any, r: EvalTaskItem) => (
                           <Space>
                             <Button size='small' onClick={() => openEvalTask(r.task_id)}>查看</Button>
-                            <Button size='small' onClick={() => { setRagasTaskId(r.task_id); loadFullRagasResults(); }}>加载结果</Button>
                           </Space>
                         )
                       }
@@ -602,22 +820,48 @@ const RAGASEvalV2: React.FC = () => {
                         <div>状态：{evalTaskDetail?.status}</div>
                         <div>模型：{evalTaskDetail?.model_name || evalTaskDetail?.evaluation_config?.ragas_llm_model || evalTaskDetail?.evaluation_config?.model_name}</div>
                         <div>总数/已处理：{evalTaskDetail?.total_cases}/{evalTaskDetail?.processed_cases}</div>
-                        <div style={{ marginTop: 8 }}>指标/汇总：</div>
-                        <pre className='mono' style={{ whiteSpace: 'pre-wrap', maxHeight: 420, overflow: 'auto' }}>{JSON.stringify(evalTaskDetail?.summary || evalTaskDetail?.metrics || evalTaskDetail, null, 2)}</pre>
+                        {evalTaskDetail?.summary && (
+                          <Card size='small' title='汇总可视化' style={{ marginTop: 8 }}>
+                            <Row gutter={12}>
+                              <Col span={12}>
+                                <div style={{ marginBottom: 8 }}>Faithfulness</div>
+                                <Progress percent={Math.round((evalTaskDetail.summary?.faithfulness || 0) * 100)} />
+                                <div style={{ margin: '12px 0 8px' }}>Answer Relevancy</div>
+                                <Progress percent={Math.round((evalTaskDetail.summary?.answer_relevancy || 0) * 100)} />
+                              </Col>
+                              <Col span={12}>
+                                <div style={{ marginBottom: 8 }}>Context Precision</div>
+                                <Progress percent={Math.round((evalTaskDetail.summary?.context_precision || 0) * 100)} />
+                                <div style={{ margin: '12px 0 8px' }}>Context Recall</div>
+                                <Progress percent={Math.round((evalTaskDetail.summary?.context_recall || 0) * 100)} />
+                              </Col>
+                            </Row>
+                          </Card>
+                        )}
+                        <Divider />
+                        <div style={{ fontWeight: 600, marginBottom: 6 }}>评测案例明细</div>
+                        <Table
+                          size='small'
+                          rowKey='question_id'
+                          columns={ragasColumns}
+                          dataSource={evalTaskDetail?.results || []}
+                          expandable={{ expandedRowRender: (r:any) => renderEvalDetail(r as any) }}
+                          pagination={{ pageSize: 8 }}
+                        />
                       </div>
                     ) : null}
                   </Modal>
-      <Modal
-        title={`推理记录详情 #${runDetailId ?? ''}`}
-        open={runDetailOpen}
-        onCancel={() => setRunDetailOpen(false)}
-        footer={null}
-        width={800}
-      >
-        <pre className='mono' style={{ whiteSpace: 'pre-wrap', maxHeight: 420, overflow: 'auto' }}>
-          {JSON.stringify(runDetail || {}, null, 2)}
-        </pre>
-      </Modal>
+                  <Modal
+                     title={`推理记录详情 #${runDetailId ?? ''}`}
+                     open={runDetailOpen}
+                     onCancel={() => setRunDetailOpen(false)}
+                     footer={null}
+                     width={1000}
+                   >
+                     {renderRunDetailContent(runDetail)}
+                   </Modal>
+
+                  {/* 已移除：评测数据处理功能 */}
 
 
                 </Space>

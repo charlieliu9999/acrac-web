@@ -99,6 +99,8 @@ evaluation_results_*.json
 trace_*.json
 official_ragas_evaluation_report_*.json
 official_ragas_evaluation_report_*.csv
+ab_test_show_reasoning_*.json
+ragas_results_*.json
 
 # Excel temporary files
 ~$*.xlsx

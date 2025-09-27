@@ -14,7 +14,7 @@ _env_file_path = str(Path(__file__).resolve().parents[2] / ".env") if not _skip_
 class Settings(BaseSettings):
     # Project info
     PROJECT_NAME: str = "ACRAC System"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.1.0"
     API_V1_STR: str = "/api/v1"
     
     # Database - 连接到Docker容器中的PostgreSQL
@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_TYPE: str = "bge-m3"
     EMBEDDING_MODEL_NAME: str = "bge-m3:latest"
     EMBEDDING_DIMENSION: int = 1024
+    
+    # Ollama Configuration
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_LLM_MODEL: str = os.getenv("OLLAMA_LLM_MODEL", "qwen3:30b")
+    OLLAMA_EMBEDDING_MODEL: str = os.getenv("OLLAMA_EMBEDDING_MODEL", "bge-m3:latest")
     
     # SiliconFlow API Configuration
     # 安全性：不再提供任何默认密钥，必须通过环境变量配置

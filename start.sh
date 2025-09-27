@@ -178,8 +178,9 @@ main() {
         if ! curl -sSf http://localhost:8080 >/dev/null 2>&1; then
             log_error "Nginx(8080) 无法访问。可能原因：端口被占用、Nginx配置错误或前端未就绪。建议执行: 'docker-compose logs nginx frontend' 排查。"
         fi
-        if ! curl -sSf http://localhost:8001/api/v1/acrac/health >/dev/null 2>&1; then
-            log_error "后端健康检查失败。请执行: 'docker-compose logs backend' 排查。"
+        # 使用轻量健康检查端点，降低误报
+        if ! curl -sSf http://localhost:8001/health >/dev/null 2>&1; then
+            log_error "后端健康检查失败。请执行: '$DC logs backend' 排查。"
         fi
     fi
     show_status

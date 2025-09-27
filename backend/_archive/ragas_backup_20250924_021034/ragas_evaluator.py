@@ -1,6 +1,7 @@
 """RAGAS评估器服务"""
 import os
 import logging
+import asyncio
 from typing import Dict, List, Any, Optional
 from datasets import Dataset
 import numpy as np
@@ -29,6 +30,9 @@ class RAGASEvaluator:
         """初始化RAGAS评估器（完全采用可配置的 evaluation 上下文，无硬编码模型）"""
         if not RAGAS_AVAILABLE:
             raise ImportError("RAGAS相关依赖未安装，请安装ragas、langchain-openai等依赖")
+        
+        # 处理 uvloop 兼容性问题
+        self._setup_event_loop_compatibility()
 
         # 读取后端配置文件 backend/config/model_contexts.json
         from pathlib import Path
@@ -97,6 +101,31 @@ class RAGASEvaluator:
 
         logger.info(f"RAGAS评估器初始化完成（LLM={llm_model}, Embedding={emb_model}）")
     
+    def _setup_event_loop_compatibility(self):
+        """设置事件循环兼容性，处理 uvloop 与 nest_asyncio 的冲突"""
+        try:
+            # 检查当前是否在 uvloop 环境中
+            loop = asyncio.get_running_loop()
+            loop_type = type(loop).__name__
+            
+            if 'uvloop' in loop_type.lower():
+                logger.info(f"检测到 uvloop 环境: {loop_type}")
+                # 设置环境变量禁用 nest_asyncio
+                os.environ['NEST_ASYNCIO_DISABLE'] = '1'
+                
+                # 尝试设置默认事件循环策略
+                try:
+                    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+                    logger.info("已设置默认事件循环策略以兼容 uvloop")
+                except Exception as e:
+                    logger.warning(f"设置事件循环策略失败: {e}")
+                    
+        except RuntimeError:
+            # 没有运行中的事件循环，这是正常情况
+            pass
+        except Exception as e:
+            logger.warning(f"事件循环兼容性设置失败: {e}")
+    
     def prepare_ragas_dataset(self, test_data: List[Dict[str, Any]]) -> Dataset:
         """准备RAGAS兼容的数据集"""
         try:
@@ -126,6 +155,9 @@ class RAGASEvaluator:
         for attempt in range(max_retries):
             try:
                 logger.info(f"开始评估单个样本 (尝试 {attempt + 1}/{max_retries}): {sample_data.get('question', 'N/A')[:50]}...")
+                
+                # 确保 uvloop 兼容性
+                self._setup_event_loop_compatibility()
                 
                 # 验证输入数据
                 required_fields = ['question', 'answer', 'contexts', 'ground_truth']
@@ -228,6 +260,9 @@ class RAGASEvaluator:
     def evaluate_batch(self, test_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """批量评估"""
         try:
+            # 确保 uvloop 兼容性
+            self._setup_event_loop_compatibility()
+            
             if not test_data:
                 return {
                     'avg_scores': {

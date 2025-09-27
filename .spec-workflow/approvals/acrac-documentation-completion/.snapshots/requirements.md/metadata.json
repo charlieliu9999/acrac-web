@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/acrac-documentation-completion/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-09-24T13:48:33.099Z",
+      "trigger": "initial",
+      "approvalId": "approval_1758721713093_au1n2nc72",
+      "approvalTitle": "ACRAC项目文档补全需求文档"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-09-24T13:50:52.885Z",
+      "trigger": "approved",
+      "approvalId": "approval_1758721713093_au1n2nc72",
+      "approvalTitle": "ACRAC项目文档补全需求文档"
+    }
+  ]
+}

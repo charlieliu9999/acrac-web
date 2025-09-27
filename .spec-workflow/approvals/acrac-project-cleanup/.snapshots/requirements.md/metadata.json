@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/acrac-project-cleanup/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-09-24T13:55:51.598Z",
+      "trigger": "initial",
+      "approvalId": "approval_1758722151594_jji804flz",
+      "approvalTitle": "ACRAC项目清理和审计需求文档"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-09-24T13:57:25.806Z",
+      "trigger": "approved",
+      "approvalId": "approval_1758722151594_jji804flz",
+      "approvalTitle": "ACRAC项目清理和审计需求文档"
+    }
+  ]
+}

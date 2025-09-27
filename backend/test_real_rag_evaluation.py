@@ -149,22 +149,22 @@ def run_ragas_evaluation(ragas_data: Dict[str, Any]) -> Dict[str, float]:
     """运行RAGAS评测"""
     try:
         # 使用项目中已有的RAGAS评估器
-        from app.services.ragas_evaluator import RAGASEvaluator
+        from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
         
         logger.info("初始化RAGAS评估器...")
-        evaluator = RAGASEvaluator()
+        evaluator = ACRACRAGASEvaluator()
         
         # 创建测试样本
-        test_sample = evaluator.create_test_sample(
-            question=ragas_data["question"],
-            answer=ragas_data["answer"],
-            contexts=ragas_data["contexts"],
-            ground_truth=ragas_data["ground_truth"]
-        )
+        test_sample = {
+            "question": ragas_data["question"],
+            "answer": ragas_data["answer"],
+            "contexts": ragas_data["contexts"],
+            "ground_truth": ragas_data["ground_truth"]
+        }
         
         # 运行单样本评测
         logger.info("开始RAGAS评测...")
-        scores = evaluator.evaluate_single_sample(test_sample)
+        scores = evaluator.evaluate_sample(test_sample)
         
         logger.info("✅ RAGAS评测完成")
         return scores

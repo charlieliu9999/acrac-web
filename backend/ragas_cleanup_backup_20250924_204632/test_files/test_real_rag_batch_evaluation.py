@@ -149,20 +149,20 @@ def run_ragas_evaluation(ragas_data_list: List[Dict[str, Any]]) -> Dict[str, Any
     """运行批量RAGAS评测"""
     try:
         # 使用项目中已有的RAGAS评估器
-        from app.services.ragas_evaluator import RAGASEvaluator
+        from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
         
         logger.info("初始化RAGAS评估器...")
-        evaluator = RAGASEvaluator()
+        evaluator = ACRACRAGASEvaluator()
         
         # 创建测试样本列表
         test_samples = []
         for ragas_data in ragas_data_list:
-            test_sample = evaluator.create_test_sample(
-                question=ragas_data["question"],
-                answer=ragas_data["answer"],
-                contexts=ragas_data["contexts"],
-                ground_truth=ragas_data["ground_truth"]
-            )
+            test_sample = {
+                "question": ragas_data["question"],
+                "answer": ragas_data["answer"],
+                "contexts": ragas_data["contexts"],
+                "ground_truth": ragas_data["ground_truth"]
+            }
             test_samples.append(test_sample)
         
         # 运行批量评测

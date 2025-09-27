@@ -9,6 +9,8 @@ import json
 import time
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, Body
@@ -44,6 +46,20 @@ class ExcelEvaluationService:
         self.api_url = os.getenv("RAG_API_URL", "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation")
         self.timeout = 300  # API超时时间（RAGAS评测较慢，适当放宽）
         self.db = db
+        # 复用HTTP连接，配置重试与连接池
+        self._session = requests.Session()
+        try:
+            retries = Retry(
+                total=3,
+                backoff_factor=0.5,
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=["POST"],
+            )
+            adapter = HTTPAdapter(pool_connections=10, pool_maxsize=50, max_retries=retries)
+            self._session.mount('http://', adapter)
+            self._session.mount('https://', adapter)
+        except Exception:
+            pass
         
     def parse_excel_file(self, file_content: bytes) -> List[Dict[str, Any]]:
         """解析Excel文件"""
@@ -134,7 +150,7 @@ class ExcelEvaluationService:
             # 调用API
             start_time = time.time()
             try:
-                response = requests.post(self.api_url, json=payload, timeout=self.timeout)
+                response = self._session.post(self.api_url, json=payload, timeout=self.timeout)
                 processing_time = time.time() - start_time
                 
                 if response.status_code != 200:
@@ -251,36 +267,52 @@ class ExcelEvaluationService:
             }
     
     def run_batch_evaluation(self, test_cases: List[Dict[str, Any]], task_id: str = None, filename: str = None):
-        """批量评测"""
+        """批量评测（并发+限流）"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         global evaluation_status
-        
+
         try:
             evaluation_status["is_running"] = True
             evaluation_status["progress"] = 0
             evaluation_status["total"] = len(test_cases)
             evaluation_status["results"] = []
             evaluation_status["error"] = None
-            
-            for i, test_case in enumerate(test_cases):
-                if not evaluation_status["is_running"]:
-                    break
-                    
-                evaluation_status["current_case"] = test_case["clinical_query"]
-                
-                # 评测单个案例
-                result = self.evaluate_single_case(test_case)
-                evaluation_status["results"].append(result)
-                
-                # 更新进度
-                evaluation_status["progress"] = i + 1
-                
-                # 避免API限流
-                time.sleep(1.0)
-            
+
+            try:
+                max_workers = int(os.getenv("EVAL_CONCURRENCY", "3"))
+            except Exception:
+                max_workers = 3
+
+            results_map = {}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(self.evaluate_single_case, tc): idx for idx, tc in enumerate(test_cases)}
+                for fut in as_completed(futures):
+                    if not evaluation_status["is_running"]:
+                        break
+                    idx = futures[fut]
+                    try:
+                        res = fut.result()
+                    except Exception as e:
+                        logger.error(f"案例执行失败: {e}")
+                        res = {
+                            "question_id": test_cases[idx].get("question_id", idx + 1),
+                            "clinical_query": test_cases[idx].get("clinical_query", ""),
+                            "ground_truth": test_cases[idx].get("ground_truth", ""),
+                            "status": "error",
+                            "error": str(e)
+                        }
+                    results_map[idx] = res
+                    evaluation_status["progress"] = len(results_map)
+                    evaluation_status["current_case"] = res.get("clinical_query")
+
+            # 按原顺序整理结果
+            ordered = [results_map[i] for i in range(len(test_cases)) if i in results_map]
+            evaluation_status["results"] = ordered
+
             # 评测完成后保存到数据库
             if task_id and filename and self.db:
                 self.save_evaluation_data_to_db(task_id, filename, test_cases, evaluation_status["results"])
-            
+
         except Exception as e:
             evaluation_status["error"] = str(e)
             logger.error(f"批量评测失败: {e}")

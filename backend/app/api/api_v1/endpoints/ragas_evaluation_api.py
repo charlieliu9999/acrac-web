@@ -82,8 +82,8 @@ class RAGASEvaluationService:
         """设置LLM和Embeddings模型（统一走模型配置的 evaluation 上下文）"""
         try:
             # 使用统一评测适配器，从 backend/config/model_contexts.json 的 contexts.evaluation 读取
-            from app.services.ragas_evaluator import RAGASEvaluator
-            evaluator = RAGASEvaluator()
+            from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
+            evaluator = ACRACRAGASEvaluator()
             llm = evaluator.llm
             embeddings = evaluator.embeddings
             logger.info(f"RAGAS评估模型: LLM={evaluator.llm_model_name}, Embedding={evaluator.embedding_model_name}")

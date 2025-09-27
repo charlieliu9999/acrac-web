@@ -193,8 +193,9 @@ async def run_real_rag_evaluation(
     # 尝试初始化 RAGAS 评估器（可选）
     ragas_evaluator = None
     try:
-        from app.services.ragas_evaluator import RAGASEvaluator  # type: ignore
-        ragas_evaluator = RAGASEvaluator()
+        from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator  # type: ignore
+        ragas_evaluator = ACRACRAGASEvaluator()
+        logger.info("使用ACRAC RAGAS评估器")
     except Exception as e:
         logger.warning(f"RAGAS评估器初始化失败，将跳过RAGAS评分: {e}")
 
@@ -210,12 +211,17 @@ async def run_real_rag_evaluation(
             question_id = test_case.get("question_id") or test_case.get("scenario_id") or f"case_{i+1}"
 
             # 构造 RAG 推理请求载荷（开启 debug 便于前端展示 trace）
+            from app.core.config import settings as _settings
+            # 从配置/环境读取检索参数，保持与RAG助手一致
+            _top_scenarios = int(os.getenv('RAG_TOP_SCENARIOS', str(getattr(_settings, 'RAG_TOP_SCENARIOS', 3))))
+            _top_recs = int(os.getenv('RAG_TOP_RECOMMENDATIONS_PER_SCENARIO', str(getattr(_settings, 'RAG_TOP_RECOMMENDATIONS_PER_SCENARIO', 3))))
+            _sim_threshold = float(os.getenv('VECTOR_SIMILARITY_THRESHOLD', str(getattr(_settings, 'VECTOR_SIMILARITY_THRESHOLD', 0.6))))
             rag_payload = {
                 "clinical_query": clinical_query,
-                "top_scenarios": 3,
-                "top_recommendations_per_scenario": 3,
+                "top_scenarios": _top_scenarios,
+                "top_recommendations_per_scenario": _top_recs,
                 "show_reasoning": True,
-                "similarity_threshold": 0.6,
+                "similarity_threshold": _sim_threshold,
                 "debug_mode": True,
                 "include_raw_data": True,
                 # 评分在本函数内进行，避免与远端重复
@@ -317,7 +323,7 @@ async def run_real_rag_evaluation(
             if ragas_evaluator and contexts and answer_text and ground_truth:
                 try:
                     evaluation_started_at = datetime.now()
-                    ragas_scores = ragas_evaluator.evaluate_single_sample(
+                    ragas_scores = ragas_evaluator.evaluate_sample(
                         {
                             "question": clinical_query,
                             "answer": answer_text,
@@ -326,6 +332,7 @@ async def run_real_rag_evaluation(
                         }
                     )
                     evaluation_completed_at = datetime.now()
+                    logger.info(f"RAGAS评分计算完成: {ragas_scores}")
                 except Exception as e:
                     logger.warning(f"RAGAS评分计算失败，已跳过该样本评分: {e}")
                     evaluation_completed_at = datetime.now() if evaluation_started_at else None

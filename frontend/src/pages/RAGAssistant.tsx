@@ -71,9 +71,9 @@ const RAGAssistant: React.FC = () => {
   ],[])
 
   const recallColumns = useMemo(()=>[
-    { title:'ID', dataIndex:'semantic_id', width:120 },
+    { title:'ID', dataIndex:'id', width:120 },
     { title:'相似度', dataIndex:'similarity', width:100, render:(v:number)=> (v||0).toFixed(3) },
-    { title:'描述', dataIndex:'description_zh' },
+    { title:'描述', dataIndex:'clinical_scenario' },
   ],[])
 
   const rerankColumns = useMemo(()=>[
@@ -317,7 +317,13 @@ const RAGAssistant: React.FC = () => {
             <Collapse bordered={false} style={{ marginTop: 8 }} items={[
               {
                 key: 'recall', label: '① 召回场景（Top8）', children: (
-                  <Table rowKey='semantic_id' size='small' pagination={false} dataSource={(result.scenarios||[]).slice(0,8)} columns={recallColumns} />
+                  <Table
+                    rowKey={(r:any)=>r.id}
+                    size='small'
+                    pagination={false}
+                    dataSource={(trace.recall_scenarios || []).slice(0,8)}
+                    columns={recallColumns}
+                  />
                 )
               },
               {

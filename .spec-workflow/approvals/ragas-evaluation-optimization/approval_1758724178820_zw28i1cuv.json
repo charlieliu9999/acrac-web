@@ -1,0 +1,45 @@
+{
+  "id": "approval_1758724178820_zw28i1cuv",
+  "title": "RAGAS 评测功能完成和优化 - 需求文档审批",
+  "filePath": ".spec-workflow/specs/ragas-evaluation-optimization/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-24T14:29:38.820Z",
+  "category": "spec",
+  "categoryName": "ragas-evaluation-optimization",
+  "response": "Feedback Summary (3 comments):\n\nGeneral Comments:\n1. 模块化设计, 支持通用评测任务\n\nSpecific Text Comments:\n1. \"1. WHEN 系统启动时 THEN RAGAS 评测引擎应该能够成功初始化并加载配置\n2. WHE...\": 前端评测过程的分解为多个步骤,数据上传、数据解析、勾选、推理; 推理完成后的中间详细数据的可视化.  对勾选推理数据进行评测, 评测完成后详细数据的可视化,\n2. \"WHEN 评测中文医学内容时 THEN 系统应该能够正确处理中文医学术语和概念\n2. WHEN 处理...\": 采用可配置模型(embedding LLM、Rerank) 模型,进行推理和评测, 保存推理的过程数据和评测的过程数据, 分开执行,对评测过程数据可视化、汇总、分析\n保证评测的结果的正确性和真实\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"前端评测过程的分解为多个步骤,数据上传、数据解析、勾选、推理; 推理完成后的中间详细数据的可视化.  对勾选推理数据进行评测, 评测完成后详细数据的可视化,\",\n      \"timestamp\": \"2025-09-24T14:35:43.247Z\",\n      \"selectedText\": \"1. WHEN 系统启动时 THEN RAGAS 评测引擎应该能够成功初始化并加载配置\\n2. WHEN 提供标准 RAGAS 数据格式时 THEN 系统应该返回四个评测指标的准确分数（0.0-1.0 范围）\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758724543247_fl4e3l2gx\"\n    },\n    {\n      \"type\": \"selection\",\n      \"comment\": \"采用可配置模型(embedding LLM、Rerank) 模型,进行推理和评测, 保存推理的过程数据和评测的过程数据, 分开执行,对评测过程数据可视化、汇总、分析\\n保证评测的结果的正确性和真实\",\n      \"timestamp\": \"2025-09-24T14:39:08.585Z\",\n      \"selectedText\": \"WHEN 评测中文医学内容时 THEN 系统应该能够正确处理中文医学术语和概念\\n2. WHEN 处理医学专业术语时 THEN 系统应该能够识别和评估医学知识的准确性\\n3. WHEN 评测临床指南相关内容时 THEN 系统应该能够评估推荐与临床指南的一致性\\n4. WHEN 评测影像学检查建议时 THEN 系统应该能够评估检查建议的医学合理性\\n5. IF 评测结果包含医学错误信息 THEN 系统应该能够识别并给出低分\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758724748585_czovh1h22\"\n    },\n    {\n      \"type\": \"general\",\n      \"comment\": \"模块化设计, 支持通用评测任务\",\n      \"timestamp\": \"2025-09-24T14:40:19.905Z\",\n      \"id\": \"comment_1758724819905_zqc7mzffm\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (3 comments):\\n\\nGeneral Comments:\\n1. 模块化设计, 支持通用评测任务\\n\\nSpecific Text Comments:\\n1. \\\"1. WHEN 系统启动时 THEN RAGAS 评测引擎应该能够成功初始化并加载配置\\n2. WHE...\\\": 前端评测过程的分解为多个步骤,数据上传、数据解析、勾选、推理; 推理完成后的中间详细数据的可视化.  对勾选推理数据进行评测, 评测完成后详细数据的可视化,\\n2. \\\"WHEN 评测中文医学内容时 THEN 系统应该能够正确处理中文医学术语和概念\\n2. WHEN 处理...\\\": 采用可配置模型(embedding LLM、Rerank) 模型,进行推理和评测, 保存推理的过程数据和评测的过程数据, 分开执行,对评测过程数据可视化、汇总、分析\\n保证评测的结果的正确性和真实\\n\",\n  \"timestamp\": \"2025-09-24T14:40:45.005Z\"\n}",
+  "respondedAt": "2025-09-24T14:40:45.011Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "前端评测过程的分解为多个步骤,数据上传、数据解析、勾选、推理; 推理完成后的中间详细数据的可视化.  对勾选推理数据进行评测, 评测完成后详细数据的可视化,",
+      "timestamp": "2025-09-24T14:35:43.247Z",
+      "selectedText": "1. WHEN 系统启动时 THEN RAGAS 评测引擎应该能够成功初始化并加载配置\n2. WHEN 提供标准 RAGAS 数据格式时 THEN 系统应该返回四个评测指标的准确分数（0.0-1.0 范围）",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758724543247_fl4e3l2gx"
+    },
+    {
+      "type": "selection",
+      "comment": "采用可配置模型(embedding LLM、Rerank) 模型,进行推理和评测, 保存推理的过程数据和评测的过程数据, 分开执行,对评测过程数据可视化、汇总、分析\n保证评测的结果的正确性和真实",
+      "timestamp": "2025-09-24T14:39:08.585Z",
+      "selectedText": "WHEN 评测中文医学内容时 THEN 系统应该能够正确处理中文医学术语和概念\n2. WHEN 处理医学专业术语时 THEN 系统应该能够识别和评估医学知识的准确性\n3. WHEN 评测临床指南相关内容时 THEN 系统应该能够评估推荐与临床指南的一致性\n4. WHEN 评测影像学检查建议时 THEN 系统应该能够评估检查建议的医学合理性\n5. IF 评测结果包含医学错误信息 THEN 系统应该能够识别并给出低分",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758724748585_czovh1h22"
+    },
+    {
+      "type": "general",
+      "comment": "模块化设计, 支持通用评测任务",
+      "timestamp": "2025-09-24T14:40:19.905Z",
+      "id": "comment_1758724819905_zqc7mzffm"
+    }
+  ]
+}

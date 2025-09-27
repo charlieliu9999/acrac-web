@@ -1,14 +1,16 @@
 import asyncio
 import sys
+import os
 
 # 修复 RAGAS 与 uvloop 的兼容性问题
+# 禁用 nest_asyncio 以避免与 uvloop 的冲突
+os.environ['NEST_ASYNCIO_DISABLE'] = '1'
+
+# 为了解决 RAGAS 与 uvloop 的兼容性问题，我们不使用 uvloop
+# 而是使用默认的 asyncio 事件循环策略
 if sys.platform != 'win32':
-    try:
-        import uvloop
-        # 如果使用 uvloop，需要设置正确的事件循环策略
-        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
-    except ImportError:
-        pass
+    # 确保使用默认的事件循环策略，避免 uvloop 相关问题
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

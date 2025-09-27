@@ -1,4 +1,5 @@
-FROM python:3.10-slim
+ARG PY_BASE_IMAGE=python:3.10-slim
+FROM ${PY_BASE_IMAGE}
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -7,8 +8,7 @@ ENV PYTHONPATH=/app
 # Silence GitPython import error if git is missing (extra safety)
 ENV GIT_PYTHON_REFRESH=quiet
 
-# Faster/more reliable PyPI mirror and longer timeout
-ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# Longer timeout for pip installs
 ENV PIP_DEFAULT_TIMEOUT=120
 
 
@@ -21,7 +21,6 @@ RUN apt-get update \
         build-essential \
         libpq-dev \
         curl \
-        git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -42,7 +41,7 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/acrac/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--loop", "asyncio"]

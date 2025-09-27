@@ -24,8 +24,8 @@ def test_answer_relevancy():
         # 配置API
         api_key = 'sk-ybghruztazvtitpwrityokshmckxkwflviwpuvseqopmxfze'
         base_url = 'https://api.siliconflow.cn/v1'
-        llm_model = 'Qwen/Qwen2.5-32B-Instruct'
-        emb_model = 'BAAI/bge-m3'
+        llm_model = os.getenv('SILICONFLOW_LLM_MODEL', 'Qwen/Qwen2.5-32B-Instruct')
+        emb_model = os.getenv('SILICONFLOW_EMBEDDING_MODEL', 'BAAI/bge-m3')
         
         print(f"配置信息:")
         print(f"  LLM模型: {llm_model}")

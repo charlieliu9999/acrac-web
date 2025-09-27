@@ -1,0 +1,27 @@
+{
+  "id": "approval_1758725223805_8ayakm6ov",
+  "title": "RAGAS 评测功能完成和优化 - 技术设计文档审批",
+  "filePath": ".spec-workflow/specs/ragas-evaluation-optimization/design.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-24T14:47:03.805Z",
+  "category": "spec",
+  "categoryName": "ragas-evaluation-optimization",
+  "response": "Feedback Summary (1 comments):\n\nSpecific Text Comments:\n1. \"ragas_evaluator_v2.py`\": 可以参考文件 /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web/backend/RAGAS/evaluators/enhanced_evaluator.py ,\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"selection\",\n      \"comment\": \"可以参考文件 /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web/backend/RAGAS/evaluators/enhanced_evaluator.py ,\",\n      \"timestamp\": \"2025-09-24T15:08:41.775Z\",\n      \"selectedText\": \"ragas_evaluator_v2.py`\",\n      \"highlightColor\": {\n        \"bg\": \"rgba(255, 235, 59, 0.3)\",\n        \"border\": \"#FFEB3B\",\n        \"name\": \"#ffeb3b\"\n      },\n      \"id\": \"comment_1758726521775_r2cx4c4jo\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nSpecific Text Comments:\\n1. \\\"ragas_evaluator_v2.py`\\\": 可以参考文件 /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web/backend/RAGAS/evaluators/enhanced_evaluator.py ,\\n\",\n  \"timestamp\": \"2025-09-24T15:14:07.672Z\"\n}",
+  "respondedAt": "2025-09-24T15:14:07.676Z",
+  "comments": [
+    {
+      "type": "selection",
+      "comment": "可以参考文件 /Users/charlieliu/git_project_vscode/09_medical/ACRAC-web/backend/RAGAS/evaluators/enhanced_evaluator.py ,",
+      "timestamp": "2025-09-24T15:08:41.775Z",
+      "selectedText": "ragas_evaluator_v2.py`",
+      "highlightColor": {
+        "bg": "rgba(255, 235, 59, 0.3)",
+        "border": "#FFEB3B",
+        "name": "#ffeb3b"
+      },
+      "id": "comment_1758726521775_r2cx4c4jo"
+    }
+  ]
+}

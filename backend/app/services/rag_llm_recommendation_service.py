@@ -13,6 +13,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.pool import ThreadedConnectionPool
 import openai
 from app.core.config import settings
 from app.services.rules_engine import load_engine
@@ -20,6 +21,9 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError, Field
 from typing import Union
 from pathlib import Path
+import threading
+import hashlib
+from collections import OrderedDict
 
 # 加载环境变量：默认读取 backend/.env；若在容器环境可通过 SKIP_LOCAL_DOTENV/DOCKER_CONTEXT 禁用
 try:
@@ -98,11 +102,24 @@ class RAGLLMRecommendationService:
             self.pgvector_probes = int(os.getenv('PGVECTOR_PROBES', '20'))
         except Exception:
             self.pgvector_probes = 20
+        # DB连接池（按需初始化）
+        self._db_pool: Optional[ThreadedConnectionPool] = None
+        try:
+            self._db_pool_max = int(os.getenv('DB_POOL_MAX', '10'))
+            self._db_pool_min = int(os.getenv('DB_POOL_MIN', '1'))
+        except Exception:
+            self._db_pool_max, self._db_pool_min = 10, 1
 
         # 基础模型连接配置
         self.api_key = os.getenv("SILICONFLOW_API_KEY") or getattr(settings, "SILICONFLOW_API_KEY", "")
         self.default_base_url = os.getenv("SILICONFLOW_BASE_URL") or getattr(settings, "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
         self.llm_client = openai.OpenAI(api_key=self.api_key, base_url=self.default_base_url)
+
+        # 候选数量上限（供LLM候选列表与后置约束使用）
+        try:
+            self.candidate_topk = int(os.getenv('RAG_CANDIDATE_TOPK', os.getenv('RAG_TOP_RECOMMENDATIONS_PER_SCENARIO', '3')))
+        except Exception:
+            self.candidate_topk = 3
 
         # 预载模型上下文（默认+场景覆盖）
         self.model_contexts: Dict[str, Dict[str, Any]] = {}
@@ -143,6 +160,32 @@ class RAGLLMRecommendationService:
         self.topic_boost = float(os.getenv("RAG_TOPIC_BOOST", "0.20"))
         self.keyword_boost = float(os.getenv("RAG_KEYWORD_BOOST", "0.05"))
         self.rating_boost = float(os.getenv("RAG_RATING_BOOST", "0.03"))
+
+        # RAG检索及重排优化参数
+        self.dynamic_rerank = os.getenv("RAG_USE_DYNAMIC_RERANK", "true").lower() == "true"
+        try:
+            self.recs_fetch_topk = int(os.getenv("RAG_RECS_FETCH_TOPK", "5"))
+        except Exception:
+            self.recs_fetch_topk = 5
+
+        # LLM输出优化
+        self.force_json_output = os.getenv("LLM_FORCE_JSON", "true").lower() == "true"
+        try:
+            self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "512"))
+        except Exception:
+            self.max_tokens = 512
+        try:
+            self.llm_seed = int(os.getenv("LLM_SEED", "0")) if os.getenv("LLM_SEED") else None
+        except Exception:
+            self.llm_seed = None
+
+        # 轻量嵌入缓存（进程内LRU）
+        self._emb_cache_lock = threading.Lock()
+        try:
+            self._emb_cache_size = int(os.getenv("EMBED_CACHE_SIZE", "256"))
+        except Exception:
+            self._emb_cache_size = 256
+        self._emb_cache: OrderedDict[str, List[float]] = OrderedDict()
 
         # 提示词配置参数
         self.top_scenarios = int(os.getenv("RAG_TOP_SCENARIOS", "2"))
@@ -270,8 +313,44 @@ class RAGLLMRecommendationService:
             'panel_id': primary.get('panel_semantic_id') or primary.get('panel_id'),
         }
 
+    class _PooledConn:
+        """轻量包装以在 close() 时归还连接池"""
+        def __init__(self, raw, pool: ThreadedConnectionPool):
+            self._raw = raw
+            self._pool = pool
+        def cursor(self, *a, **kw):
+            return self._raw.cursor(*a, **kw)
+        def close(self):
+            try:
+                self._pool.putconn(self._raw)
+            except Exception:
+                try:
+                    self._raw.close()
+                except Exception:
+                    pass
+        # 兼容常见方法
+        def commit(self):
+            return self._raw.commit()
+        def rollback(self):
+            return self._raw.rollback()
+        @property
+        def raw(self):
+            return self._raw
+
+    def _init_pool(self, host: str) -> None:
+        """初始化连接池（仅一次）"""
+        if self._db_pool is not None:
+            return
+        cfg = dict(self.db_config)
+        cfg['host'] = host
+        self._db_pool = ThreadedConnectionPool(
+            minconn=self._db_pool_min,
+            maxconn=self._db_pool_max,
+            **cfg,
+        )
+
     def connect_db(self):
-        """建立数据库连接（带重试与Docker主机名回退）"""
+        """建立数据库连接（优先连接池；带重试与Docker主机名回退）"""
         host = self.db_config.get('host') or 'localhost'
         port = int(self.db_config.get('port') or 5432)
         cfg_base = dict(self.db_config)
@@ -284,15 +363,35 @@ class RAGLLMRecommendationService:
         interval = 2
         start = time.time()
         last_err = None
+        # 若已有连接池，直接取用
+        if self._db_pool is not None:
+            try:
+                conn = self._db_pool.getconn()
+                return self._PooledConn(conn, self._db_pool)
+            except Exception as e:
+                logger.warning(f"从连接池取连接失败，尝试重建: {e}")
+                try:
+                    self._db_pool.closeall()
+                except Exception:
+                    pass
+                self._db_pool = None
         while time.time() - start < max_wait:
             for h in fallback_hosts:
                 try:
                     cfg = dict(cfg_base)
                     cfg['host'] = h
-                    conn = psycopg2.connect(**cfg)
+                    # 首先尝试建立连接池
+                    self._init_pool(h)
+                    if self._db_pool is not None:
+                        conn = self._db_pool.getconn()
+                        if h != host:
+                            logger.warning(f"DB连接使用备用主机 '{h}'（原配置: '{host}'）")
+                        return self._PooledConn(conn, self._db_pool)
+                    # 回退：直接单连接（极端情况）
+                    raw = psycopg2.connect(**cfg)
                     if h != host:
                         logger.warning(f"DB连接使用备用主机 '{h}'（原配置: '{host}'）")
-                    return conn
+                    return raw
                 except Exception as e:
                     last_err = e
                     time.sleep(interval)
@@ -389,7 +488,7 @@ class RAGLLMRecommendationService:
                     AND cs.is_active = true
                     AND cr.is_active = true
                     AND pd.is_active = true
-                    AND cr.appropriateness_rating >= 5
+                    AND cr.appropriateness_rating > 5
                 ORDER BY cs.semantic_id, cr.appropriateness_rating DESC
             """
             cur.execute(sql)
@@ -673,9 +772,9 @@ JSON中不允许出现尾随逗号
             if top_p is None:
                 top_p = 0.7
 
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[
+            kwargs: Dict[str, Any] = {
+                "model": model_name,
+                "messages": [
                     {"role": "system", "content": (
                         "你是一位专业的放射科医生，擅长影像检查推荐。"
                         "必须仅输出有效JSON，不得包含解释、代码块(如```json)、或任何额外文字。"
@@ -683,8 +782,20 @@ JSON中不允许出现尾随逗号
                     )},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=temperature,
-                top_p=top_p,
+                "temperature": temperature,
+                "top_p": top_p,
+            }
+            # 强制JSON输出（部分OpenAI兼容服务支持）
+            if self.force_json_output:
+                kwargs["response_format"] = {"type": "json_object"}
+            # 限制生成长度，避免过度输出导致延迟
+            if self.max_tokens and self.max_tokens > 0:
+                kwargs["max_tokens"] = self.max_tokens
+            if self.llm_seed is not None:
+                kwargs["seed"] = self.llm_seed
+
+            response = client.chat.completions.create(
+                **kwargs
             )
 
             result = response.choices[0].message.content
@@ -698,6 +809,23 @@ JSON中不允许出现尾随逗号
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             return self._fallback_response()
+
+    def _embed_cached(self, text: str, model: str, base_url: str) -> List[float]:
+        """进程内LRU缓存的嵌入生成"""
+        key_src = f"{model}|{base_url}|{hashlib.md5((text or '').encode('utf-8')).hexdigest()}"
+        with self._emb_cache_lock:
+            if key_src in self._emb_cache:
+                # LRU: move to end
+                vec = self._emb_cache.pop(key_src)
+                self._emb_cache[key_src] = vec
+                return vec
+        vec = embed_with_siliconflow(text, api_key=self.api_key, model=model, base_url=base_url)
+        with self._emb_cache_lock:
+            self._emb_cache[key_src] = vec
+            if len(self._emb_cache) > self._emb_cache_size:
+                # pop oldest
+                self._emb_cache.popitem(last=False)
+        return vec
 
     def _fallback_response(self) -> str:
         """LLM调用失败时的降级响应"""
@@ -918,9 +1046,9 @@ JSON中不允许出现尾随逗号
             context_reranker = active_context.get('reranker_model')
 
             t_embed_start = time.time()
-            query_vector = embed_with_siliconflow(
+            # 使用带LRU的嵌入生成，减少重复请求
+            query_vector = self._embed_cached(
                 query,
-                api_key=self.api_key,
                 model=context_embedding_model,
                 base_url=context_base_url,
             )
@@ -952,6 +1080,8 @@ JSON中不允许出现尾随逗号
                 t_search_start = time.time()
                 scenarios = self.search_clinical_scenarios(conn, query_vector, top_k=recall_k)
                 timings["search_ms"] = int((time.time() - t_search_start) * 1000)
+                # 保存原始召回顺序（按向量距离升序，即相似度降序）供trace展示
+                scenarios_original = list(scenarios)
                 scope_info = self._extract_scope_info(scenarios)
                 scoped_context = self._resolve_inference_context(scope_info)
                 if scoped_context != active_context:
@@ -966,29 +1096,43 @@ JSON中不允许出现尾随逗号
                     context_llm_model = scoped_context.get('llm_model', context_llm_model)
                     context_embedding_model = scoped_context.get('embedding_model', context_embedding_model)
                     context_reranker = scoped_context.get('reranker_model', context_reranker)
-                # 取出召回场景的推荐，增强rerank语料
+                # 取出召回场景的推荐，增强rerank语料（仅取前N以降低查询量）
                 try:
-                    recall_ids = [s['semantic_id'] for s in scenarios]
+                    fetch_n = max(1, min(self.recs_fetch_topk, len(scenarios)))
+                    recall_ids = [s['semantic_id'] for s in scenarios[:fetch_n]]
                     scenarios_with_recs_all = self.get_scenario_with_recommendations(conn, recall_ids)
                 except Exception as re:
                     logger.warning(f"召回场景推荐获取失败: {re}")
                     scenarios_with_recs_all = []
-                # 面向 panel/topic/关键词 的软重排 + reranker（优先）
+                # 面向 panel/topic/关键词 的软重排 + reranker（优先）；在高置信召回时可跳过rerank以提速
                 try:
-                    target_panels, target_topics = self._infer_targets_from_query(query)
                     t_rerank_start = time.time()
-                    scenarios = self._rerank_scenarios(
-                        query,
-                        scenarios,
-                        target_panels=target_panels,
-                        target_topics=target_topics,
-                        alpha_panel=self.panel_boost,
-                        alpha_topic=self.topic_boost,
-                        alpha_kw=self.keyword_boost,
-                        scenarios_with_recs=scenarios_with_recs_all,
-                        reranker_base_url=context_base_url,
-                        reranker_model=context_reranker,
-                    )
+                    skip_rerank = False
+                    if self.dynamic_rerank and len(scenarios) >= 2:
+                        s0, s1 = scenarios[0], scenarios[1]
+                        try:
+                            gap = float(s0.get('similarity', 0.0)) - float(s1.get('similarity', 0.0))
+                            if float(s0.get('similarity', 0.0)) >= 0.85 and gap >= 0.05:
+                                skip_rerank = True
+                        except Exception:
+                            pass
+                    if not skip_rerank:
+                        target_panels, target_topics = self._infer_targets_from_query(query)
+                        scenarios = self._rerank_scenarios(
+                            query,
+                            scenarios,
+                            target_panels=target_panels,
+                            target_topics=target_topics,
+                            alpha_panel=self.panel_boost,
+                            alpha_topic=self.topic_boost,
+                            alpha_kw=self.keyword_boost,
+                            scenarios_with_recs=scenarios_with_recs_all,
+                            reranker_base_url=context_base_url,
+                            reranker_model=context_reranker,
+                        )
+                    else:
+                        if do_debug:
+                            logger.info("跳过rerank（高置信召回且相似度差距明显）")
                 except Exception as re:
                     logger.warning(f"场景重排失败: {re}")
                     t_rerank_start = time.time()  # 确保后续赋值存在
@@ -1105,14 +1249,48 @@ JSON中不允许出现尾随逗号
                         scenarios_with_recs = self.get_scenario_with_recommendations(conn, scenario_ids)
                 except Exception:
                     scenarios_with_recs = self.get_scenario_with_recommendations(conn, scenario_ids)
-                # 从场景推荐构建候选清单
-                candidates = []
+                # 从场景推荐构建候选清单（遵循评分阈值与Top-N），再融合基于procedure_dictionary的候选
+                # 1) 汇总场景推荐并按评分排序（仅保留 >5 分）
+                flat_recs = []
                 for sc in scenarios_with_recs:
                     for rec in sc.get('recommendations', []) or []:
-                        candidates.append({
-                            'procedure_name_zh': rec.get('procedure_name_zh'),
-                            'modality': rec.get('modality')
-                        })
+                        try:
+                            rating = float(rec.get('appropriateness_rating') or 0)
+                        except Exception:
+                            rating = 0.0
+                        if rating > 5.0:
+                            flat_recs.append({
+                                'procedure_name_zh': rec.get('procedure_name_zh'),
+                                'modality': rec.get('modality'),
+                                'rating': rating
+                            })
+                # 去重并按评分降序
+                uniq = {}
+                for r in flat_recs:
+                    key = (r.get('procedure_name_zh') or '', r.get('modality') or '')
+                    if not key[0]:
+                        continue
+                    if key not in uniq or (r.get('rating', 0) > uniq[key].get('rating', 0)):
+                        uniq[key] = r
+                sorted_recs = sorted(uniq.values(), key=lambda x: x.get('rating', 0), reverse=True)
+                # 2) 取Top-N
+                candidates = [{ 'procedure_name_zh': r['procedure_name_zh'], 'modality': r.get('modality') } for r in sorted_recs[:max(1, int(self.candidate_topk))]]
+                seen_keys = set((c['procedure_name_zh'] or '', c.get('modality') or '') for c in candidates)
+                if db_ok and conn is not None:
+                    try:
+                        proc_candidates = self.search_procedure_candidates(conn, query_vector, top_k=self.procedure_candidate_topk)
+                        for c in proc_candidates:
+                            name = c.get('procedure_name_zh') or c.get('name_zh') or c.get('procedure_name')
+                            modality = c.get('modality')
+                            key = (name or '', modality or '')
+                            if name and key not in seen_keys:
+                                seen_keys.add(key)
+                                candidates.append({'procedure_name_zh': name, 'modality': modality})
+                                # 维持候选上限
+                                if len(candidates) >= max(1, int(self.candidate_topk)):
+                                    break
+                    except Exception as ce:
+                        logger.warning(f"补充候选检索失败: {ce}")
                 t_prompt_start = time.time()
                 prompt = self.prepare_llm_prompt(
                     query, scenarios, scenarios_with_recs, is_low_similarity=False,
@@ -1136,6 +1314,14 @@ JSON中不允许出现尾随逗号
                             } for s in scenarios_with_recs
                         ]
                     }
+                    if candidates:
+                        debug_info["step_5_candidates"] = {
+                            "count": len(candidates),
+                            "preview": [
+                                {"name": c.get("procedure_name_zh"), "modality": c.get("modality")}
+                                for c in candidates[:10]
+                            ]
+                        }
                     debug_info["step_6_prompt_length"] = len(prompt)
                     debug_info["step_6_prompt_preview"] = prompt[:500] + "..."
 
@@ -1203,6 +1389,27 @@ JSON中不允许出现尾随逗号
             except Exception as _fe:
                 logger.warning(f"构建降级结果失败: {_fe}")
 
+            # 若存在候选集合，则对LLM输出做候选内约束（通用、非规则硬编码）
+            try:
+                if 'candidates' in locals() and candidates:
+                    cand_names = set()
+                    for c in candidates:
+                        nm = c.get('procedure_name_zh') or c.get('name_zh') or c.get('procedure_name')
+                        if nm:
+                            cand_names.add(nm)
+                    recs = (parsed_result or {}).get('recommendations') or []
+                    filtered = [r for r in recs if (r.get('procedure_name') in cand_names)]
+                    if filtered and (len(filtered) != len(recs)):
+                        parsed_result = dict(parsed_result)
+                        parsed_result['recommendations'] = filtered
+                        if do_debug:
+                            debug_info["post_filter_applied"] = {
+                                "original_count": len(recs),
+                                "filtered_count": len(filtered)
+                            }
+            except Exception as _pf:
+                logger.warning(f"候选集合约束失败（不影响结果）: {_pf}")
+
             # 规则引擎：post阶段（审计/修订）
             try:
                 if self.rules_engine and self.rules_engine.enabled:
@@ -1261,6 +1468,7 @@ JSON中不允许出现尾随逗号
                         or entry.get("description")
                     )
 
+                # 原始召回（相似度降序）
                 trace["recall_scenarios"] = [
                     {
                         "id": s.get("semantic_id"),
@@ -1268,8 +1476,9 @@ JSON中不允许出现尾随逗号
                         "topic": s.get("topic_name"),
                         "similarity": s.get("similarity"),
                         "clinical_scenario": _scenario_text(s),
-                    } for s in scenarios
+                    } for s in (scenarios_original if 'scenarios_original' in locals() else scenarios)
                 ]
+                # rerank 后顺序
                 trace["rerank_scenarios"] = [
                     {
                         "id": s.get("semantic_id"),
@@ -1330,7 +1539,10 @@ JSON中不允许出现尾随逗号
             }
         finally:
             if 'conn' in locals() and conn:
-                conn.close()
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def _extract_query_signals(self, query: str) -> Dict[str, Any]:
         """Lightweight, rule-friendly signals from query text.

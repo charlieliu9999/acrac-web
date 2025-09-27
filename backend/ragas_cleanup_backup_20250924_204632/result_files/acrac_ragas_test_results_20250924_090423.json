@@ -1,0 +1,35 @@
+{
+  "avg_scores": {
+    "faithfulness": 0.0,
+    "answer_relevancy": 0.0,
+    "context_precision": 0.0,
+    "context_recall": 0.0
+  },
+  "individual_scores": [
+    {
+      "faithfulness": 0.0,
+      "context_precision": 0.0,
+      "context_recall": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "faithfulness": 0.0,
+      "context_precision": 0.0,
+      "context_recall": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "faithfulness": 0.0,
+      "context_precision": 0.0,
+      "context_recall": 0.0,
+      "answer_relevancy": 0.0
+    }
+  ],
+  "total_samples": 3,
+  "evaluation_metadata": {
+    "timestamp": "2025-09-24T09:04:23.812218",
+    "evaluator_version": "ACRAC_RAGAS_V2",
+    "llm_model": "Qwen/Qwen2.5-32B-Instruct",
+    "embedding_model": "BAAI/bge-m3"
+  }
+}

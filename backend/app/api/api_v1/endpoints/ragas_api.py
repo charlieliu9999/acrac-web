@@ -27,7 +27,14 @@ from app.models.ragas_models import EvaluationTask, ScenarioResult, EvaluationMe
 from app.services.ragas_service import (
     validate_file, parse_uploaded_file, validate_test_cases, run_real_rag_evaluation as service_run_real_rag_evaluation
 )
-from app.tasks.ragas_tasks import process_batch_evaluation
+
+# 条件性导入 celery 任务，避免在没有 celery 的环境中出错
+try:
+    from app.tasks.ragas_tasks import process_batch_evaluation
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    process_batch_evaluation = None
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -622,7 +629,7 @@ async def start_evaluation(
         db.commit()
         db.refresh(db_task)
 
-        if request.async_mode:
+        if request.async_mode and CELERY_AVAILABLE:
             # 异步执行评测
             task = process_batch_evaluation.delay(
                 task_id=task_id,
@@ -638,6 +645,10 @@ async def start_evaluation(
                 summary=None,
                 processing_time=None
             )
+        elif request.async_mode and not CELERY_AVAILABLE:
+            # Celery不可用时，记录警告并转为同步模式
+            logger.warning("Celery不可用，异步评测请求将转为同步执行")
+            # 继续执行同步模式
         else:
             # 同步执行评测（不推荐用于大量数据）
             start_time = time.time()
@@ -1305,8 +1316,8 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
 
         # 初始化评测器（严格使用模型配置中的 evaluation 上下文）
         try:
-            from app.services.ragas_evaluator import RAGASEvaluator
-            evaluator = RAGASEvaluator()
+            from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
+            evaluator = ACRACRAGASEvaluator()
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"RAGASEvaluator 初始化失败: {e}")
 
@@ -1384,12 +1395,19 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                 if req.ground_truths and isinstance(req.ground_truths, dict):
                     gt = req.ground_truths.get(int(r.id)) or req.ground_truths.get(str(r.id))
 
-                # 计算RAGAS（有GT时四项，否则保留 faithfulness / answer_relevancy）
+                # 计算RAGAS（优先使用标准评测器；若分数无效则回退到增强评测器并记录详细信息）
                 ragas_scores = {
                     "faithfulness": 0.0,
                     "answer_relevancy": 0.0,
                     "context_precision": 0.0,
                     "context_recall": 0.0,
+                }
+                evaluation_details = {
+                    "method": "ragas_v2",
+                    "ragas_llm_model": getattr(evaluator, "llm_model_name", None),
+                    "ragas_embedding_model": getattr(evaluator, "embedding_model_name", None),
+                    "contexts_count": len(contexts),
+                    "has_ground_truth": bool(gt),
                 }
                 try:
                     sample = {
@@ -1399,9 +1417,31 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                     }
                     if gt:
                         sample["ground_truth"] = gt
-                    ragas_scores = evaluator.evaluate_single_sample(sample)
+                    ragas_scores = evaluator.evaluate_sample(sample)
                 except Exception as e:
                     logger.warning(f"RAGAS单样本评分失败(run_id={r.id}): {e}")
+
+                # 若所有分数为0，则回退到增强评测器（LLM提示词+启发式），以避免全零结果
+                valid_scores_try = [v for v in ragas_scores.values() if isinstance(v, (int, float)) and v > 0]
+                if not valid_scores_try:
+                    try:
+                        from app.services.enhanced_ragas_evaluator import EnhancedRAGASEvaluator, EvaluationConfig
+                        enhanced = EnhancedRAGASEvaluator(evaluation_config=EvaluationConfig())
+                        detailed = await enhanced.evaluate_with_detailed_results({
+                            "id": str(r.id),
+                            "question": question,
+                            "answer": answer_text,
+                            "contexts": contexts,
+                            "ground_truth": gt or "",
+                        })
+                        ragas_scores = detailed.metrics or ragas_scores
+                        evaluation_details.update({
+                            "method": "enhanced_fallback",
+                            "process_data": detailed.process_data,
+                            "chinese_processing": detailed.chinese_processing_info,
+                        })
+                    except Exception as fe:
+                        logger.warning(f"增强评测回退失败(run_id={r.id}): {fe}")
 
                 valid_scores = [v for v in ragas_scores.values() if isinstance(v, (int, float)) and v > 0]
                 overall_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0.0
@@ -1425,6 +1465,7 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                         "source_run_id": r.id,
                         "ragas_llm_model": getattr(evaluator, "llm_model_name", None),
                         "ragas_embedding_model": getattr(evaluator, "embedding_model_name", None),
+                        "ragas_details": evaluation_details,
                     },
                     status="completed",
                     processing_stage="offline-evaluation",
@@ -1443,6 +1484,7 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                     "rag_answer": answer_text,
                     "ragas_scores": ragas_scores,
                     "contexts": contexts,
+                    "evaluation_details": evaluation_details,
                 })
                 completed += 1
             except Exception as e:
@@ -1583,15 +1625,15 @@ async def run_real_rag_evaluation(
 
         # 初始化RAGAS评估器（并回写任务实际使用的评测模型）
         try:
-            from app.services.ragas_evaluator import RAGASEvaluator
-            ragas_evaluator = RAGASEvaluator()
+            from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
+            ragas_evaluator = ACRACRAGASEvaluator()
             if db and task_id:
                 try:
                     _task = db.query(EvaluationTask).filter(EvaluationTask.task_id == task_id).first()
                     if _task:
                         cfg = _task.evaluation_config or {}
-                        cfg["ragas_llm_model"] = getattr(ragas_evaluator, "llm_model_name", None)
-                        cfg["ragas_embedding_model"] = getattr(ragas_evaluator, "embedding_model_name", None)
+                        cfg["ragas_llm_model"] = getattr(ragas_evaluator, "llm_model", None)
+                        cfg["ragas_embedding_model"] = getattr(ragas_evaluator, "embedding_model", None)
                         _task.evaluation_config = cfg
                         db.commit()
                 except Exception:
@@ -1685,7 +1727,7 @@ async def run_real_rag_evaluation(
                             "contexts": contexts,
                             "ground_truth": ground_truth
                         }
-                        ragas_scores = ragas_evaluator.evaluate_single_sample(ragas_data)
+                        ragas_scores = ragas_evaluator.evaluate_sample(ragas_data)
                         evaluation_completed_at = datetime.now()
                     except Exception as e:
                         logger.warning(f"RAGAS评分计算失败: {e}")
