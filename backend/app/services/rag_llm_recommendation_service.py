@@ -17,6 +17,7 @@ from psycopg2.pool import ThreadedConnectionPool
 import openai
 from app.core.config import settings
 from app.services.rules_engine import load_engine
+from app.services.query_signals import QuerySignalExtractor
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError, Field
 from typing import Union
@@ -204,6 +205,13 @@ class RAGLLMRecommendationService:
         except Exception:
             self._contexts_mtime = 0.0
 
+        # Query signals extractor (configurable, negation-aware)
+        try:
+            self._signals_extractor = QuerySignalExtractor()
+        except Exception as e:
+            logger.warning(f"QuerySignalExtractor init failed, fallback to built-in: {e}")
+            self._signals_extractor = None
+
     def _maybe_reload_contexts(self) -> None:
         """当检测到 model_contexts.json 发生变化时，重新加载并热更新关键参数。
         解决多worker下 /models/reload 仅作用于单进程的问题。
@@ -301,6 +309,15 @@ class RAGLLMRecommendationService:
             ctx['temperature'] = self.default_inference_context.get('temperature')
         if 'top_p' not in ctx and self.default_inference_context.get('top_p') is not None:
             ctx['top_p'] = self.default_inference_context.get('top_p')
+        # 允许上下文传递 max_tokens / reasoning 开关 / 禁用思维指令
+        if 'max_tokens' not in ctx and self.default_inference_context.get('max_tokens') is not None:
+            ctx['max_tokens'] = self.default_inference_context.get('max_tokens')
+        if 'reasoning_model' not in ctx and self.default_inference_context.get('reasoning_model') is not None:
+            ctx['reasoning_model'] = self.default_inference_context.get('reasoning_model')
+        if 'disable_thinking' not in ctx and self.default_inference_context.get('disable_thinking') is not None:
+            ctx['disable_thinking'] = self.default_inference_context.get('disable_thinking')
+        if 'no_thinking_tag' not in ctx and self.default_inference_context.get('no_thinking_tag') is not None:
+            ctx['no_thinking_tag'] = self.default_inference_context.get('no_thinking_tag')
         return ctx
 
     def _extract_scope_info(self, scenarios: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
@@ -772,25 +789,54 @@ JSON中不允许出现尾随逗号
             if top_p is None:
                 top_p = 0.7
 
+            # 推断/读取“思维模型”与禁用思维配置
+            def _looks_reasoning(name: str) -> bool:
+                n = (name or '').lower()
+                for key in ['gpt-oss', 'deepseek-r1', 'qwq', 'r1', 'reason']:
+                    if key in n:
+                        return True
+                return False
+            reasoning_flag = bool(ctx.get('reasoning_model')) or _looks_reasoning(model_name)
+            disable_thinking = bool(ctx.get('disable_thinking'))
+            no_thinking_tag = (ctx.get('no_thinking_tag') or '').strip()
+
+            # 如需禁用思维，追加抑制性约束
+            sys_inst = (
+                "你是一位专业的放射科医生，擅长影像检查推荐。"
+                "必须仅输出有效JSON，不得包含解释、代码块(如```json)、或任何额外文字。"
+                "JSON字段名必须与要求完全一致，且不得包含尾随逗号。"
+                "严禁输出<think>、思维链、推理过程、系统提示或任何与JSON无关的内容。"
+            )
+            user_content = prompt
+            if disable_thinking and no_thinking_tag:
+                user_content = f"{prompt}\n{no_thinking_tag}"
+
             kwargs: Dict[str, Any] = {
                 "model": model_name,
                 "messages": [
-                    {"role": "system", "content": (
-                        "你是一位专业的放射科医生，擅长影像检查推荐。"
-                        "必须仅输出有效JSON，不得包含解释、代码块(如```json)、或任何额外文字。"
-                        "JSON字段名必须与要求完全一致，且不得包含尾随逗号。"
-                    )},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": sys_inst},
+                    {"role": "user", "content": user_content}
                 ],
                 "temperature": temperature,
                 "top_p": top_p,
             }
             # 强制JSON输出（部分OpenAI兼容服务支持）
-            if self.force_json_output:
+            is_ollama = bool(base_url and (("11434" in base_url) or ("ollama" in base_url.lower())))
+            if self.force_json_output and not is_ollama:
                 kwargs["response_format"] = {"type": "json_object"}
             # 限制生成长度，避免过度输出导致延迟
-            if self.max_tokens and self.max_tokens > 0:
-                kwargs["max_tokens"] = self.max_tokens
+            max_out = ctx.get('max_tokens') if ctx.get('max_tokens') is not None else self.max_tokens
+            try:
+                max_out = int(max_out) if max_out is not None else None
+            except Exception:
+                max_out = None
+            if reasoning_flag and (not max_out or max_out < 1024):
+                max_out = 1024
+            if max_out and max_out > 0:
+                kwargs["max_tokens"] = max_out
+            # 禁用思维的额外停止标记（兼容部分模型输出<think>）
+            if disable_thinking:
+                kwargs["stop"] = kwargs.get("stop") or ["</think>", "<think>"]
             if self.llm_seed is not None:
                 kwargs["seed"] = self.llm_seed
 
@@ -893,8 +939,33 @@ JSON中不允许出现尾随逗号
             # 去掉可能的尾随逗号
             candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
 
-            # 尝试解析
-            data = json.loads(candidate)
+            # 一次尝试：严格JSON解析
+            try:
+                data = json.loads(candidate)
+            except Exception:
+                # 针对部分模型（如 Ollama 上的 gpt-oss）输出的宽松JSON：
+                # 1) 单引号键/值 -> 双引号；2) 未加引号的键 -> 自动补双引号
+                relaxed = candidate
+                # 单引号包裹的键：{'key': → {"key":
+                relaxed = re.sub(r"([\{,]\s*)'([^'\n\r]+?)'(\s*:)", r'\1"\2"\3', relaxed)
+                # 单引号包裹的字符串值：: 'val' → : "val"
+                relaxed = re.sub(r"(:\s*)'([^'\n\r]*?)'", r'\1"\2"', relaxed)
+                # 未加引号的简单键：{ key: → { "key":
+                relaxed = re.sub(r"([\{,]\s*)([A-Za-z_][A-Za-z0-9_\-]*)(\s*:)", r'\1"\2"\3', relaxed)
+                # 再次移除尾随逗号
+                relaxed = re.sub(r",\s*([}\]])", r"\1", relaxed)
+                try:
+                    data = json.loads(relaxed)
+                except Exception:
+                    # 最后兜底：尝试使用 ast.literal_eval 解析 python风格字典
+                    try:
+                        import ast
+                        data_py = ast.literal_eval(relaxed)
+                        # 确保可序列化
+                        data = json.loads(json.dumps(data_py, ensure_ascii=False))
+                    except Exception as _:
+                        # 维持原有异常流程，由下方容错解析兜底
+                        raise
 
             # 结果规范化
             if not isinstance(data, dict):
@@ -1249,33 +1320,66 @@ JSON中不允许出现尾随逗号
                         scenarios_with_recs = self.get_scenario_with_recommendations(conn, scenario_ids)
                 except Exception:
                     scenarios_with_recs = self.get_scenario_with_recommendations(conn, scenario_ids)
-                # 从场景推荐构建候选清单（遵循评分阈值与Top-N），再融合基于procedure_dictionary的候选
-                # 1) 汇总场景推荐并按评分排序（仅保留 >5 分）
-                flat_recs = []
+                # 从场景推荐构建候选清单：先保证每个已选场景的前N条进入候选（保持顺序），再补全全局高分项，再融合 procedure_dictionary 候选
+                # 目标上限：动态取 max(candidate_topk, top_scenarios*top_recs_per_scenario)
+                try:
+                    cap_dynamic = int((top_scenarios or self.top_scenarios) * (top_recs_per_scenario or self.top_recommendations_per_scenario))
+                except Exception:
+                    cap_dynamic = self.candidate_topk
+                candidate_cap = max(int(self.candidate_topk or 0), int(cap_dynamic or 0), 1)
+
+                candidates: List[Dict[str, Any]] = []
+                seen_keys: set = set()
+                # 1) 逐场景保序加入每场景Top-N，确保关键项（如CTA）不会被全局排序淹没
                 for sc in scenarios_with_recs:
-                    for rec in sc.get('recommendations', []) or []:
-                        try:
-                            rating = float(rec.get('appropriateness_rating') or 0)
-                        except Exception:
-                            rating = 0.0
-                        if rating > 5.0:
-                            flat_recs.append({
-                                'procedure_name_zh': rec.get('procedure_name_zh'),
-                                'modality': rec.get('modality'),
-                                'rating': rating
-                            })
-                # 去重并按评分降序
-                uniq = {}
-                for r in flat_recs:
-                    key = (r.get('procedure_name_zh') or '', r.get('modality') or '')
-                    if not key[0]:
-                        continue
-                    if key not in uniq or (r.get('rating', 0) > uniq[key].get('rating', 0)):
-                        uniq[key] = r
-                sorted_recs = sorted(uniq.values(), key=lambda x: x.get('rating', 0), reverse=True)
-                # 2) 取Top-N
-                candidates = [{ 'procedure_name_zh': r['procedure_name_zh'], 'modality': r.get('modality') } for r in sorted_recs[:max(1, int(self.candidate_topk))]]
-                seen_keys = set((c['procedure_name_zh'] or '', c.get('modality') or '') for c in candidates)
+                    added = 0
+                    for rec in (sc.get('recommendations') or [])[: max(1, int(top_recommendations_per_scenario or self.top_recommendations_per_scenario))]:
+                        name = rec.get('procedure_name_zh') or rec.get('procedure_name_en')
+                        if not name:
+                            continue
+                        key = (name, rec.get('modality') or '')
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        candidates.append({'procedure_name_zh': name, 'modality': rec.get('modality')})
+                        added += 1
+                        if len(candidates) >= candidate_cap:
+                            break
+                    if len(candidates) >= candidate_cap:
+                        break
+
+                # 2) 补全全局高分项（rating 降序，>5 分），避免漏掉其他高评分项目
+                if len(candidates) < candidate_cap:
+                    flat_recs: List[Dict[str, Any]] = []
+                    for sc in scenarios_with_recs:
+                        for rec in sc.get('recommendations', []) or []:
+                            name = rec.get('procedure_name_zh') or rec.get('procedure_name_en')
+                            if not name:
+                                continue
+                            try:
+                                rating = float(rec.get('appropriateness_rating') or 0)
+                            except Exception:
+                                rating = 0.0
+                            if rating > 5.0:
+                                flat_recs.append({'procedure_name_zh': name, 'modality': rec.get('modality'), 'rating': rating})
+                    # 去重保留最高分
+                    best: Dict[tuple, Dict[str, Any]] = {}
+                    for r in flat_recs:
+                        k = (r.get('procedure_name_zh') or '', r.get('modality') or '')
+                        if not k[0]:
+                            continue
+                        if (k not in best) or (float(r.get('rating') or 0) > float(best[k].get('rating') or 0)):
+                            best[k] = r
+                    for r in sorted(best.values(), key=lambda x: x.get('rating', 0.0), reverse=True):
+                        k = (r.get('procedure_name_zh') or '', r.get('modality') or '')
+                        if k in seen_keys:
+                            continue
+                        candidates.append({'procedure_name_zh': r['procedure_name_zh'], 'modality': r.get('modality')})
+                        seen_keys.add(k)
+                        if len(candidates) >= candidate_cap:
+                            break
+
+                # 3) 如仍不足，再融合基于 procedure_dictionary 的相似候选
                 if db_ok and conn is not None:
                     try:
                         proc_candidates = self.search_procedure_candidates(conn, query_vector, top_k=self.procedure_candidate_topk)
@@ -1287,7 +1391,7 @@ JSON中不允许出现尾随逗号
                                 seen_keys.add(key)
                                 candidates.append({'procedure_name_zh': name, 'modality': modality})
                                 # 维持候选上限
-                                if len(candidates) >= max(1, int(self.candidate_topk)):
+                                if len(candidates) >= candidate_cap:
                                     break
                     except Exception as ce:
                         logger.warning(f"补充候选检索失败: {ce}")
@@ -1545,15 +1649,20 @@ JSON中不允许出现尾随逗号
                     pass
 
     def _extract_query_signals(self, query: str) -> Dict[str, Any]:
-        """Lightweight, rule-friendly signals from query text.
-        This avoids any online LLM; extend offline for better coverage.
+        """Extract rule-friendly signals from query using configurable patterns.
+        Falls back to minimal built-in heuristics if config unavailable.
         """
+        try:
+            if self._signals_extractor:
+                return self._signals_extractor.extract(query)
+        except Exception as e:
+            logger.warning(f"signals extractor failed, fallback: {e}")
+        # Fallback: preserve previous logic with simple negation guard
         q = query or ''
         signals: Dict[str, Any] = {}
-        # pregnancy
-        if any(k in q for k in ['孕', '妊娠', '孕妇', '围产', '产后']):
+        negs = ['非妊娠', '未孕', '否认妊娠', '备孕', '排除妊娠']
+        if any(k in q for k in ['孕', '妊娠', '孕妇', '围产', '产后']) and not any(n in q for n in negs):
             signals['pregnancy_status'] = '妊娠/围产'
-        # urgency / thunderclap
         kws = []
         for k in ['急诊', '急性', '突发', '雷击样', '霹雳样', 'TCH', 'SAH', '蛛网膜下腔出血']:
             if (k.lower() in q.lower()) or (k in q):
@@ -2108,3 +2217,16 @@ print(json.dumps(out))
 
 # 创建全局服务实例
 rag_llm_service = RAGLLMRecommendationService()
+
+# --- Modular override ---
+# To enable the new modular implementation while preserving import path
+# and class name, we rebind the class and global instance to the facade.
+try:
+    from app.services.rag.facade import (
+        RAGLLMRecommendationService as _ModularRAGLLMRecommendationService,
+    )
+
+    RAGLLMRecommendationService = _ModularRAGLLMRecommendationService  # type: ignore
+    rag_llm_service = RAGLLMRecommendationService()  # recreate with modular facade
+except Exception as _e:  # fallback to legacy class if facade import fails
+    pass

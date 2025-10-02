@@ -74,3 +74,13 @@ echo "2. 运行: docker-compose up --build"
 echo "3. 如果仍有问题，请检查网络代理设置"
 
 
+
+
+
+
+
+
+
+
+
+

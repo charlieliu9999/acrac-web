@@ -320,16 +320,16 @@ async def run_real_rag_evaluation(
                 "context_precision": 0.0,
                 "context_recall": 0.0,
             }
-            if ragas_evaluator and contexts and answer_text and ground_truth:
+            if contexts and answer_text and ground_truth:
                 try:
                     evaluation_started_at = datetime.now()
-                    ragas_scores = ragas_evaluator.evaluate_sample(
-                        {
-                            "question": clinical_query,
-                            "answer": answer_text,
-                            "contexts": contexts,
-                            "ground_truth": ground_truth,
-                        }
+                    # 使用主服务中的统一实现，确保四项指标（含 answer_relevancy）一致
+                    from app.services.rag_llm_recommendation_service import rag_llm_service  # 延迟导入避免环依赖
+                    ragas_scores = rag_llm_service._compute_ragas_scores(
+                        user_input=clinical_query,
+                        answer=answer_text,
+                        contexts=contexts,
+                        reference=ground_truth,
                     )
                     evaluation_completed_at = datetime.now()
                     logger.info(f"RAGAS评分计算完成: {ragas_scores}")

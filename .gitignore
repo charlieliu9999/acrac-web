@@ -37,6 +37,8 @@ venv.bak/
 .env.test.local
 .env.production.local
 acrac.env
+backend/.env
+backend/acrac.env
 backend/.env.*
 frontend/.env.*
 

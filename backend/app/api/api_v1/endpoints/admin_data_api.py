@@ -48,6 +48,11 @@ class ContextConfig(BaseModel):
     # 新增：可配置推理超参（不强制）
     temperature: Optional[float] = None
     top_p: Optional[float] = None
+    # 新增：推理控制选项
+    max_tokens: Optional[int] = None
+    reasoning_model: Optional[bool] = None  # 思维/推理风格模型（需要更高输出上限）
+    disable_thinking: Optional[bool] = None  # 明确禁止输出 <think>/思维链
+    no_thinking_tag: Optional[str] = None   # 可选：追加到提示词末尾的“禁用思维”提示，例如 '/nothinking'
 
 
 class ScenarioBinding(BaseModel):
@@ -211,7 +216,12 @@ async def upload_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         ts = time.strftime('%Y%m%d_%H%M%S')
-        dest = UPLOAD_DIR / f'{ts}_{file.filename}'
+        # 仅保留基名并校验扩展，防止路径穿越与类型绕过
+        safe_name = Path(file.filename or "").name
+        ext = (Path(safe_name).suffix or "").lower()
+        if ext not in {'.csv'}:
+            raise HTTPException(status_code=400, detail='仅支持CSV文件')
+        dest = UPLOAD_DIR / f'{ts}_{safe_name}'
         #
 						#   streaming 
         with dest.open('wb') as f:

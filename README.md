@@ -20,6 +20,79 @@ ACRAC (American College of Radiology Appropriateness Criteria) 是一个基于�
 - **向量模型**: SiliconFlow BGE-M3 (1024维)
 - **容器化**: Docker + Docker Compose
 
+> 模块化RAG服务说明：见 docs/RAG_MODULAR_SERVICE.md（向量、召回、重排、提示词、LLM、解析、RAGAS 等可独立服务化的端点与部署方案）。
+
+## 运行配置与优先级
+
+为避免“硬编码/虚假兜底”，系统采用明确的配置优先级与显式失败策略：
+
+- 优先级（高→低）：请求级参数 > 模型上下文（config/model_contexts.json + scenario_overrides）> 环境变量（.env/.env.docker）> 代码默认值。
+- 失败策略：当 LLM 无法调用或输出无效 JSON 时，接口返回 `success=false` 与错误信息；不会生成“伪造”的推荐结果。
+
+### 关键环境变量（默认值）
+
+- 向量/数据库：`PG*`、`DATABASE_URL`、`REDIS_URL`
+- 模型默认：`SILICONFLOW_BASE_URL`、`SILICONFLOW_LLM_MODEL`、`SILICONFLOW_EMBEDDING_MODEL`（可被上下文覆盖）
+- 秘钥：`SILICONFLOW_API_KEY` 或 `OPENAI_API_KEY`（仅放在环境，不进入配置文件）
+- RAG 行为：
+  - `STRICT_EMBEDDING`（生产建议 true；false 仅用于离线/CI 调试）
+  - `RAG_USE_RERANKER`（是否启用重排）与 `RERANK_PROVIDER`（auto/local/siliconflow）
+  - `RAG_SCENARIO_RECALL_TOPK`（召回 TopK，用于语义检索，不等于展示数量）
+- LLM 控制：`LLM_FORCE_JSON`、`LLM_MAX_TOKENS`（可被上下文或请求覆盖）
+- RAGAS 评测：`RAG_API_URL` 默认指向新管线 `/acrac/rag-services/pipeline/recommend`
+
+### 模型上下文（热更新）
+
+- 位置：`config/model_contexts.json`
+- 用途：全局/场景级覆盖推理/评测模型、`max_tokens`、`temperature`、`top_p`、禁用思维链等；支持 `scenario_overrides`。
+- 修改后无需重启，服务会按 mtime 自动热加载。
+
+### 请求级参数（页面即时控制）
+
+- 入口：`POST /api/v1/acrac/rag-services/pipeline/recommend`
+- 常用字段：
+  - `top_scenarios`（展示的场景数）
+  - `top_recommendations_per_scenario`（每场景带入候选数）
+  - `show_reasoning`（是否显示理由）
+  - `similarity_threshold`（相似度阈值）
+  - `compute_ragas`、`ground_truth`
+  - `llm_options`（新增）：可传入 `max_tokens`、`temperature`、`top_p`、`disable_thinking`、`no_thinking_tag` 等临时覆盖，仅对本次请求生效。
+
+## 规则引擎（Rules Engine）
+
+- 默认配置文件：`config/rules_packs.json`（可通过 `RULES_CONFIG_PATH` 覆盖）
+- 启用/审计开关：
+  - `POST /api/v1/acrac/rag-llm/rules-config` `{enabled, audit_only}`
+  - 审计日志随响应返回于 `debug_info.rules_audit.rerank/post`
+- 执行点：
+  - 重排后（rerank）：支持 boost/filter 等；审计写入 `rules_audit.rerank`
+  - 解析后（post）：支持 warn/fix/override；审计写入 `rules_audit.post`
+
+## RAGAS 评测
+
+- 使用内嵌评测（pipeline 中 `compute_ragas=true`）时：
+  - 有 `ground_truth`：返回 4 项（faithfulness、answer_relevancy、context_precision、context_recall）
+  - 无 `ground_truth`：仅返回与参考答案无关的 2 项（faithfulness、answer_relevancy）
+  - 评测结果位于 `result.ragas_scores`（顶层）与 `trace.ragas_scores`（兼容旧 UI）
+  - 失败原因见 `result.ragas_error`（或 `trace.ragas_error`）
+
+## 端点（核心）
+
+- 新管线：`POST /api/v1/acrac/rag-services/pipeline/recommend`
+  - 支持 `llm_options` 自定义每次请求的 `max_tokens` 等参数
+  - 调试输出（`debug_mode=true`）包含：
+    - `trace.recall_scenarios`（召回详情）
+    - `trace.rerank_scenarios`（重排详情）
+    - `trace.llm_raw` / `trace.llm_parsed`（原文与解析）
+
+## 严格失败与无“造假兜底”
+
+- 当 LLM 调用失败或输出无效 JSON 时：
+  - 服务返回 `success=false` 与明确 `message`，不生成伪造推荐
+  - 解析器仅用于键名与格式修正，不将失败结果伪装为“成功推荐”
+  - 在开发/离线场景中可设 `STRICT_EMBEDDING=false` 便于联调，但生产需设为 true
+
+
 ### 前端技术栈
 - **框架**: React 18 + TypeScript
 - **构建工具**: Vite

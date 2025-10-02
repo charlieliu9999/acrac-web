@@ -11,9 +11,15 @@
           "enabled": true,
           "priority": 10,
           "condition": {
-            "regex": ["query", "(阴囊|睾丸|扭转|scrot|scrotal|scrotum|torsion)"]
+            "regex": [
+              "query",
+              "(阴囊|睾丸|扭转|scrot|scrotal|scrotum|torsion)"
+            ]
           },
-          "action": { "type": "boost", "by": 0.2 }
+          "action": {
+            "type": "boost",
+            "by": 0.2
+          }
         }
       ]
     },

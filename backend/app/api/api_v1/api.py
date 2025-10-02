@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.api_v1.endpoints import acrac_simple, intelligent_analysis, three_methods_api, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_standalone_api, evaluation_project_api, inference_evaluation_api
+from app.api.api_v1.endpoints import acrac_simple, intelligent_analysis, three_methods_api, vector_search_api_v2, rag_llm_api, data_stats, tools_api, data_browse_api, admin_data_api, excel_evaluation_api, ragas_standalone_api, evaluation_project_api, inference_evaluation_api, rag_services_api
 # 临时注释掉 RAGAS 相关导入，解决 uvloop 兼容性问题
 # from app.api.api_v1.endpoints import ragas_evaluation_api
 from app.api.api_v1.endpoints import ragas_api
@@ -21,6 +21,9 @@ api_router.include_router(vector_search_api_v2.router, prefix="/acrac/vector/v2"
 
 # Include the RAG+LLM intelligent recommendation API
 api_router.include_router(rag_llm_api.router, prefix="/acrac/rag-llm", tags=["rag-llm-recommendation"])
+
+# Include modular RAG services API
+api_router.include_router(rag_services_api.router, prefix="/acrac/rag-services", tags=["rag-services"])
 
 # Include the data statistics API
 api_router.include_router(data_stats.router, prefix="/data", tags=["data-statistics"])

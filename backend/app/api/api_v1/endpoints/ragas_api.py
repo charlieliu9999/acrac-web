@@ -595,7 +595,8 @@ async def start_evaluation(
             raise HTTPException(status_code=400, detail=f"没有有效的测试用例: {errors}")
 
         # 依赖的RAG-LLM服务健康检查，避免长时间排队失败
-        rag_api_url_env = os.getenv("RAG_API_URL", "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation")
+        # Default to in-cluster backend service + new pipeline endpoint; env can override
+        rag_api_url_env = os.getenv("RAG_API_URL", "http://backend:8000/api/v1/acrac/rag-services/pipeline/recommend")
         try:
             health_url = rag_api_url_env.replace("/intelligent-recommendation", "/rag-llm-status")
             resp = requests.get(health_url, timeout=10)
@@ -1616,7 +1617,7 @@ async def run_real_rag_evaluation(
         logger.info(f"开始真实RAG评测，任务ID: {task_id}, 测试用例数: {len(test_cases)}")
 
         # RAG-LLM API端点
-        rag_api_url = os.getenv("RAG_API_URL", "http://127.0.0.1:8002/api/v1/acrac/rag-llm/intelligent-recommendation")
+        rag_api_url = os.getenv("RAG_API_URL", "http://backend:8000/api/v1/acrac/rag-services/pipeline/recommend")
 
         evaluation_results = []
         total_cases = len(test_cases)

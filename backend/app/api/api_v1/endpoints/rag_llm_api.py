@@ -204,6 +204,65 @@ async def set_rules_packs(req: RulesPacksRequest) -> RulesPacksResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"写入/重载规则包失败: {e}")
 
+
+# ---- Rules simulate (dry-run) ----
+from typing import Literal
+
+
+class RulesSimulateRequest(BaseModel):
+    stage: Literal['rerank', 'post_llm'] = Field(..., description='规则作用阶段')
+    query: Optional[str] = Field('', description='临床查询文本，用于提取 query_signals')
+    scenarios: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description='用于 rerank 的场景列表（可选）')
+    llm_parsed: Optional[Dict[str, Any]] = Field(default_factory=dict, description='用于 post_llm 的已解析LLM输出（可选）')
+
+
+class RulesSimulateResponse(BaseModel):
+    audit_logs: List[Dict[str, Any]] = Field(default_factory=list)
+    scenarios: Optional[List[Dict[str, Any]]] = None
+    parsed: Optional[Dict[str, Any]] = None
+
+
+@router.post("/rules-simulate", summary="规则试运行（不触发检索/LLM）", response_model=RulesSimulateResponse)
+async def rules_simulate(req: RulesSimulateRequest) -> RulesSimulateResponse:
+    try:
+        eng = getattr(rag_llm_service, 'rules_engine', None)
+        if not eng:
+            from app.services.rules_engine import load_engine
+            eng = load_engine()
+        # 临时开启并强制审计模式，避免修改真实结果
+        prev_enabled, prev_audit = eng.enabled, eng.audit_only
+        eng.enabled, eng.audit_only = True, True
+        try:
+            if req.stage == 'rerank':
+                ctx = {
+                    "query": req.query or '',
+                    "query_signals": rag_llm_service._extract_query_signals(req.query or ''),
+                }
+                scenarios = req.scenarios or []
+                res = eng.apply_rerank(ctx, scenarios)
+                return RulesSimulateResponse(
+                    audit_logs=res.get('audit_logs') or [],
+                    scenarios=res.get('scenarios') or scenarios
+                )
+            else:
+                ctx = {
+                    "query": req.query or '',
+                    "query_signals": rag_llm_service._extract_query_signals(req.query or ''),
+                    "scenarios": req.scenarios or []
+                }
+                parsed = req.llm_parsed or {}
+                res = eng.apply_post(ctx, parsed)
+                return RulesSimulateResponse(
+                    audit_logs=res.get('audit_logs') or [],
+                    parsed=res.get('parsed') or parsed
+                )
+        finally:
+            eng.enabled, eng.audit_only = prev_enabled, prev_audit
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"规则试运行失败: {e}")
+
 @router.get("/intelligent-recommendation-simple",
            summary="简单智能推荐接口",
            description="通过URL参数进行快速智能推荐")
