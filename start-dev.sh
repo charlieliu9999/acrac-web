@@ -173,10 +173,10 @@ start_backend() {
     log_info "等待后端服务启动..."
     sleep 5
 
-    # 检查后端健康状态
+    # 检查后端健康状态（使用根 /health 端点，避免依赖业务路由）
     MAX_ATTEMPTS=10
     for ((ATTEMPT=1; ATTEMPT<=MAX_ATTEMPTS; ATTEMPT++)); do
-        if curl -s http://localhost:8001/api/v1/acrac/health >/dev/null 2>&1; then
+        if curl -s http://localhost:8001/health >/dev/null 2>&1; then
             log_success "后端服务启动成功 (PID: $BACKEND_PID)"
             return
         fi
