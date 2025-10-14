@@ -191,17 +191,6 @@ main() {
 # 错误处理
 trap 'log_error "启动过程中发生错误，请检查日志"; exit 1' ERR
 
-# 端口占用检测（尽量友好，若被占用则退出并提示使用合适脚本）
-port_in_use() {
-    local port=$1
-    if command -v lsof >/dev/null 2>&1; then
-        lsof -i TCP:${port} -sTCP:LISTEN >/dev/null 2>&1
-        return $?
-    else
-        # 尝试 nc 探测
-        (echo >/dev/tcp/127.0.0.1/${port}) >/dev/null 2>&1 && return 0 || return 1
-    fi
-}
 
 # 运行主函数
 main "$@"

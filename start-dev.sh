@@ -211,7 +211,7 @@ start_frontend() {
     fi
 
     # 启动前端开发服务器
-    log_info "启动前端开发服务器 (端口: 5183)..."
+    log_info "启动前端开发服务器 (端口: 5173)..."
     nohup npm run dev > ../logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo $FRONTEND_PID > ../logs/frontend.pid
@@ -225,7 +225,7 @@ start_frontend() {
     # 检查前端服务状态
     MAX_ATTEMPTS=10
     for ((ATTEMPT=1; ATTEMPT<=MAX_ATTEMPTS; ATTEMPT++)); do
-        if curl -s http://localhost:5183 >/dev/null 2>&1; then
+        if curl -s http://localhost:5173 >/dev/null 2>&1; then
             log_success "前端服务启动成功 (PID: $FRONTEND_PID)"
             return
         fi

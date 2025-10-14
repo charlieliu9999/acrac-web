@@ -113,6 +113,7 @@ RAGAS/
 
 # Archive
 archive/
+backend/_archive/
 
 # Sensitive data files
 ACR_data/
@@ -130,3 +131,7 @@ uploads/
 **/config/*.json
 !**/config/*example*.json
 !**/config/*sample*.json
+
+# GitHub release cleanup
+ROOT_CLEANUP_SUMMARY.md
+api_detection_tool/

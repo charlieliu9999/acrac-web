@@ -4,6 +4,8 @@
 
 ACRAC (American College of Radiology Appropriateness Criteria) 是一个基于向量数据库的医疗影像智能推荐系统，能够根据患者症状、病史和临床特征，智能推荐最适合的影像检查项目。
 
+> 📖 **详细文档**: 请查看 [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) 获取完整的项目说明和使用指南。
+
 ## 核心特性
 
 - 🧠 **智能向量检索**: 使用SiliconFlow BGE-M3模型进行医学语义理解
@@ -129,55 +131,31 @@ ACRAC-web/
 
 ## 快速开始
 
-### 环境要求
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15+ with pgvector
-- Docker & Docker Compose
-
-### 1. 克隆项目
+### 方式一：一键启动（推荐）
 ```bash
-git clone <repository-url>
-cd ACRAC-web
+# 启动所有服务
+./start.sh
+
+# 停止所有服务
+./stop.sh
 ```
 
-### 2. 配置环境
+### 方式二：开发环境
+```bash
+# 启动开发环境（数据库容器 + 本地前后端）
+./start-dev.sh
+```
+
+### 环境配置
 ```bash
 # 复制环境配置文件
 cp backend/acrac.env.example backend/.env
 
-# 编辑配置文件，设置SiliconFlow API密钥
+# 编辑配置文件，设置必要的API密钥
 vim backend/.env
 ```
 
-### 3. 启动数据库
-```bash
-docker-compose up -d postgres
-```
-
-### 4. 构建数据库
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# 构建向量数据库
-python scripts/build_acrac_from_csv_siliconflow.py build --csv-file ../ACR_data/ACR_final.csv
-```
-
-### 5. 启动后端服务
-```bash
-cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 6. 启动前端服务
-```bash
-cd frontend
-npm install
-npm run dev
-```
+> 📖 **详细说明**: 请查看 [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) 获取完整的安装和使用指南。
 
 ## API 使用
 
