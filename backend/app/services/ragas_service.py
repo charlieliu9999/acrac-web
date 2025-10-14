@@ -190,14 +190,9 @@ async def run_real_rag_evaluation(
     completed_cases = 0
     failed_cases = 0
 
-    # 尝试初始化 RAGAS 评估器（可选）
-    ragas_evaluator = None
-    try:
-        from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator  # type: ignore
-        ragas_evaluator = ACRACRAGASEvaluator()
-        logger.info("使用ACRAC RAGAS评估器")
-    except Exception as e:
-        logger.warning(f"RAGAS评估器初始化失败，将跳过RAGAS评分: {e}")
+    # 读取评测模型上下文（与RAG助手一致）
+    import app.services.rag_llm_recommendation_service as rag_mod  # type: ignore
+    _eva_ctx = getattr(getattr(rag_mod.rag_llm_service, 'contexts', {}), 'default_evaluation_context', {}) or {}
 
     for i, test_case in enumerate(test_cases or []):
         try:
@@ -368,8 +363,8 @@ async def run_real_rag_evaluation(
                         "rag_result": rag_result,
                         "contexts": contexts,
                         "model_name": model_name,
-                        "ragas_llm_model": getattr(ragas_evaluator, "llm_model_name", None),
-                        "ragas_embedding_model": getattr(ragas_evaluator, "embedding_model_name", None),
+                        "ragas_llm_model": _eva_ctx.get('llm_model'),
+                        "ragas_embedding_model": _eva_ctx.get('embedding_model'),
                     },
                     status="completed",
                     processing_stage="evaluation",

@@ -86,6 +86,44 @@ const RAGAssistant: React.FC = () => {
 
   const trace = result?.trace || {}
 
+  // Fallback builder: if trace is missing/empty, derive from available fields
+  const viewTrace = React.useMemo(() => {
+    const t: any = { ...(result?.trace || {}) }
+    // recall fallback from scenarios (best-effort)
+    if (!Array.isArray(t.recall_scenarios) || t.recall_scenarios.length === 0) {
+      const arr = Array.isArray(result?.scenarios) ? result?.scenarios : []
+      if (arr.length > 0) {
+        t.recall_scenarios = arr.map((s: any) => ({
+          id: s.semantic_id || s.id,
+          panel: s.panel_name,
+          topic: s.topic_name,
+          similarity: s.similarity ?? s.similarity_score,
+          clinical_scenario: s.clinical_scenario || s.description_zh || s.description_en || s.scenario_description,
+        }))
+      }
+    }
+    // rerank fallback from scenarios (already reranked on service side)
+    if (!Array.isArray(t.rerank_scenarios) || t.rerank_scenarios.length === 0) {
+      const arr = Array.isArray(result?.scenarios) ? result?.scenarios : []
+      if (arr.length > 0) {
+        t.rerank_scenarios = arr.map((s: any) => ({
+          id: s.semantic_id || s.id,
+          _rerank_score: s._rerank_score,
+          panel: s.panel_name,
+          topic: s.topic_name,
+          similarity: s.similarity ?? s.similarity_score,
+          clinical_scenario: s.clinical_scenario || s.description_zh || s.description_en || s.scenario_description,
+        }))
+      }
+    }
+    // prompt fallback from debug preview
+    if (!t.final_prompt) {
+      const preview = result?.debug_info?.step_6_prompt_preview
+      if (typeof preview === 'string' && preview.length > 0) t.final_prompt = preview
+    }
+    return t
+  }, [result])
+
   const exportJSON = () => {
     if (!result) return
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' })
@@ -321,7 +359,7 @@ const RAGAssistant: React.FC = () => {
                     rowKey={(r:any)=>r.id}
                     size='small'
                     pagination={false}
-                    dataSource={(trace.recall_scenarios || []).slice(0,8)}
+                    dataSource={(viewTrace.recall_scenarios || []).slice(0,8)}
                     columns={recallColumns}
                   />
                 )
@@ -351,12 +389,12 @@ const RAGAssistant: React.FC = () => {
               },
               {
                 key: 'rerank', label: '③ 重排结果', children: (
-                  <Table rowKey='id' size='small' pagination={false} dataSource={trace.rerank_scenarios || []} columns={rerankColumns} />
+                  <Table rowKey='id' size='small' pagination={false} dataSource={viewTrace.rerank_scenarios || []} columns={rerankColumns} />
                 )
               },
               {
                 key: 'prompt', label: '④ 提示词（Prompt）', children: (
-                  <pre className='mono' style={{ whiteSpace:'pre-wrap' }}>{trace.final_prompt || '(调试模式下可显示)'}</pre>
+                  <pre className='mono' style={{ whiteSpace:'pre-wrap' }}>{viewTrace.final_prompt || '(调试模式下可显示)'}</pre>
                 )
               }
             ]} />

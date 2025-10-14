@@ -1315,12 +1315,9 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
         if not runs:
             raise HTTPException(status_code=404, detail="未找到指定的运行记录")
 
-        # 初始化评测器（严格使用模型配置中的 evaluation 上下文）
-        try:
-            from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
-            evaluator = ACRACRAGASEvaluator()
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"RAGASEvaluator 初始化失败: {e}")
+        # 使用模块化服务中的 evaluation 上下文（与RAG助手保持一致）
+        import app.services.rag_llm_recommendation_service as rag_mod
+        eva_ctx = getattr(getattr(rag_mod.rag_llm_service, 'contexts', {}), 'default_evaluation_context', {}) or {}
 
         # 创建任务
         task_id = str(uuid.uuid4())
@@ -1339,8 +1336,8 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
             total_scenarios=len(runs),
             status=TaskStatus.PROCESSING,
             evaluation_config={
-                "ragas_llm_model": getattr(evaluator, "llm_model_name", None),
-                "ragas_embedding_model": getattr(evaluator, "embedding_model_name", None),
+                "ragas_llm_model": eva_ctx.get('llm_model'),
+                "ragas_embedding_model": eva_ctx.get('embedding_model'),
                 "mode": "offline-from-runs"
             },
             started_at=datetime.now()
@@ -1404,21 +1401,20 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                     "context_recall": 0.0,
                 }
                 evaluation_details = {
-                    "method": "ragas_v2",
-                    "ragas_llm_model": getattr(evaluator, "llm_model_name", None),
-                    "ragas_embedding_model": getattr(evaluator, "embedding_model_name", None),
+                    "method": "modular_eval",
+                    "ragas_llm_model": eva_ctx.get('llm_model'),
+                    "ragas_embedding_model": eva_ctx.get('embedding_model'),
                     "contexts_count": len(contexts),
                     "has_ground_truth": bool(gt),
                 }
                 try:
-                    sample = {
-                        "question": question,
-                        "answer": answer_text,
-                        "contexts": contexts,
-                    }
-                    if gt:
-                        sample["ground_truth"] = gt
-                    ragas_scores = evaluator.evaluate_sample(sample)
+                    # 统一使用模块化服务的评分（读取evaluation上下文）
+                    ragas_scores = rag_mod.rag_llm_service._compute_ragas_scores(
+                        user_input=question,
+                        answer=answer_text,
+                        contexts=contexts,
+                        reference=gt or "",
+                    )
                 except Exception as e:
                     logger.warning(f"RAGAS单样本评分失败(run_id={r.id}): {e}")
 
@@ -1464,8 +1460,8 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
                     overall_score=overall_score,
                     evaluation_metadata={
                         "source_run_id": r.id,
-                        "ragas_llm_model": getattr(evaluator, "llm_model_name", None),
-                        "ragas_embedding_model": getattr(evaluator, "embedding_model_name", None),
+                        "ragas_llm_model": eva_ctx.get('llm_model'),
+                        "ragas_embedding_model": eva_ctx.get('embedding_model'),
                         "ragas_details": evaluation_details,
                     },
                     status="completed",
@@ -1537,63 +1533,10 @@ async def offline_evaluate_from_runs(req: OfflineEvaluateRequest, db: Session = 
         raise HTTPException(status_code=500, detail=f"离线评测失败: {str(e)}")
 
 
-async def run_ragas_evaluation_task(
-    task_id: str,
-    test_cases: List[dict],
-    model_name: str,
-    base_url: Optional[str] = None,
-    evaluation_config: Optional[dict] = None
-):
-    """异步执行RAGAS评测任务"""
-    from app.core.database import SessionLocal
-    from app.api.api_v1.endpoints.ragas_evaluation_api import ragas_service
-
-    db = SessionLocal()
-    try:
-        # 更新任务状态为运行中
-        task = db.query(EvaluationTask).filter(EvaluationTask.task_id == task_id).first()
-        if task:
-            task.status = TaskStatus.PROCESSING
-            task.started_at = datetime.now()
-            db.commit()
-
-        # 执行评测
-        start_time = time.time()
-        result = ragas_service.run_evaluation(
-            test_cases=test_cases,
-            model_name=model_name,
-            base_url=base_url
-        )
-        processing_time = time.time() - start_time
-
-        # 更新任务状态
-        if task:
-            task.status = TaskStatus.COMPLETED if result["status"] == "success" else TaskStatus.FAILED
-            task.completed_at = datetime.now()
-            task.progress_percentage = 100
-
-            if result["status"] == "error":
-                task.error_message = result.get("error", "未知错误")
-            else:
-                task.completed_scenarios = len(test_cases)
-                task.failed_scenarios = 0
-
-            db.commit()
-
-        logger.info(f"异步评测任务完成: {task_id}, 耗时: {processing_time:.2f}秒")
-
-    except Exception as e:
-        logger.error(f"异步评测任务失败: {task_id}, 错误: {e}")
-
-        # 更新任务状态为失败
-        if task:
-            task.status = TaskStatus.FAILED
-            task.completed_at = datetime.now()
-            task.error_message = str(e)
-            db.commit()
-
-    finally:
-        db.close()
+"""
+异步评测任务（旧实现）已移除。
+若需要异步执行，可基于 `ACRACRAGASEvaluator` 集成到 Celery 或后台任务队列。
+"""
 
 # ==================== 健康检查端点 ====================
 
@@ -1624,24 +1567,21 @@ async def run_real_rag_evaluation(
         completed_cases = 0
         failed_cases = 0
 
-        # 初始化RAGAS评估器（并回写任务实际使用的评测模型）
-        try:
-            from app.services.ragas_evaluator_v2 import ACRACRAGASEvaluator
-            ragas_evaluator = ACRACRAGASEvaluator()
-            if db and task_id:
-                try:
-                    _task = db.query(EvaluationTask).filter(EvaluationTask.task_id == task_id).first()
-                    if _task:
-                        cfg = _task.evaluation_config or {}
-                        cfg["ragas_llm_model"] = getattr(ragas_evaluator, "llm_model", None)
-                        cfg["ragas_embedding_model"] = getattr(ragas_evaluator, "embedding_model", None)
-                        _task.evaluation_config = cfg
-                        db.commit()
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.warning(f"RAGAS评估器初始化失败: {e}，将跳过RAGAS评分")
-            ragas_evaluator = None
+        # 读取评测上下文并记录到任务（与RAG助手一致）
+        import app.services.rag_llm_recommendation_service as rag_mod
+        _eva_ctx = getattr(getattr(rag_mod.rag_llm_service, 'contexts', {}), 'default_evaluation_context', {}) or {}
+        ragas_evaluator = None  # 统一不再直接实例化独立评估器
+        if db and task_id:
+            try:
+                _task = db.query(EvaluationTask).filter(EvaluationTask.task_id == task_id).first()
+                if _task:
+                    cfg = _task.evaluation_config or {}
+                    cfg["ragas_llm_model"] = _eva_ctx.get('llm_model')
+                    cfg["ragas_embedding_model"] = _eva_ctx.get('embedding_model')
+                    _task.evaluation_config = cfg
+                    db.commit()
+            except Exception:
+                pass
 
         for i, test_case in enumerate(test_cases):
             try:
@@ -1719,16 +1659,16 @@ async def run_real_rag_evaluation(
                     "context_recall": 0.0
                 }
 
-                if ragas_evaluator and contexts and answer_text and ground_truth:
+                if contexts and answer_text and ground_truth:
                     try:
                         evaluation_started_at = datetime.now()
-                        ragas_data = {
-                            "question": clinical_query,
-                            "answer": answer_text,
-                            "contexts": contexts,
-                            "ground_truth": ground_truth
-                        }
-                        ragas_scores = ragas_evaluator.evaluate_sample(ragas_data)
+                        # 使用模块化服务评分（基于 evaluation 上下文）
+                        ragas_scores = rag_mod.rag_llm_service._compute_ragas_scores(
+                            user_input=clinical_query,
+                            answer=answer_text,
+                            contexts=contexts,
+                            reference=ground_truth,
+                        )
                         evaluation_completed_at = datetime.now()
                     except Exception as e:
                         logger.warning(f"RAGAS评分计算失败: {e}")
@@ -1764,9 +1704,9 @@ async def run_real_rag_evaluation(
                         evaluation_metadata={
                             "rag_result": rag_result,
                             "contexts": contexts,
-                            "model_name": (getattr(ragas_evaluator, "llm_model_name", None) if ragas_evaluator else model_name),
-                            "ragas_llm_model": getattr(ragas_evaluator, "llm_model_name", None),
-                            "ragas_embedding_model": getattr(ragas_evaluator, "embedding_model_name", None)
+                            "model_name": model_name,
+                            "ragas_llm_model": _eva_ctx.get('llm_model'),
+                            "ragas_embedding_model": _eva_ctx.get('embedding_model')
                         },
                         status="completed",
                         processing_stage="evaluation",

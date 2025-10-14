@@ -31,7 +31,7 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.services.rag_llm_recommendation_service import rag_llm_service  # type: ignore
+import app.services.rag_llm_recommendation_service as rag_mod  # type: ignore
 
 
 def load_cases_from_excel(path: Path, limit: int = None) -> List[Dict[str, Any]]:
@@ -79,7 +79,7 @@ def extract_topk_names(resp: Dict[str, Any], k: int = 3) -> List[str]:
 
 def run_one_case(case: Dict[str, Any], show_reasoning: bool, top_scenarios: int, top_recs: int, sim_thres: float, with_ragas: bool) -> Dict[str, Any]:
     st = time.time()
-    res = rag_llm_service.generate_intelligent_recommendation(
+    res = rag_mod.rag_llm_service.generate_intelligent_recommendation(
         query=case['clinical_query'],
         top_scenarios=top_scenarios,
         top_recommendations_per_scenario=top_recs,
@@ -240,4 +240,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

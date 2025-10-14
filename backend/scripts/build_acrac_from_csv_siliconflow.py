@@ -164,19 +164,17 @@ class ACRACBuilder:
         try:
             self.conn = psycopg2.connect(**self.db_config)
             self.cursor = self.conn.cursor()
-            # Test connection first
+            # Smoke-test the connection first
             self.cursor.execute("SELECT 1")
             self.cursor.fetchone()
-            # Test vector type availability before registering
-            try:
-                self.cursor.execute("SELECT '[1,2,3]'::vector(3)")
-                self.cursor.fetchone()
-                # Vector type works, now register
-                if PGVECTOR_AVAILABLE:
+            # 尝试注册 pgvector 适配器；若扩展尚未创建，则记录警告但不中断
+            if PGVECTOR_AVAILABLE:
+                try:
                     register_vector(self.conn)
-            except Exception as ve:
-                logger.error(f"Vector type test failed: {ve}")
-                return False
+                except Exception as ve:
+                    logger.warning(
+                        "pgvector extension not available yet during connect(): %s", ve
+                    )
             return True
         except Exception as e:
             logger.error(f"DB connect failed: {e}")
@@ -192,6 +190,11 @@ class ACRACBuilder:
     def create_schema(self) -> bool:
         try:
             self.cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            if PGVECTOR_AVAILABLE:
+                try:
+                    register_vector(self.conn)
+                except Exception as ve:
+                    logger.warning(f"register_vector failed after enabling vector extension: {ve}")
             # Drop in dependency order
             self.cursor.execute("DROP TABLE IF EXISTS vector_search_logs CASCADE;")
             self.cursor.execute("DROP TABLE IF EXISTS data_update_history CASCADE;")
@@ -501,7 +504,7 @@ class ACRACBuilder:
         rename_map: Dict[str, str] = {}
         for canon, candidates in column_aliases.items():
             col = find_col(candidates)
-            if col:
+            if col and col not in rename_map:
                 rename_map[col] = canon
 
         if rename_map:

@@ -49,16 +49,17 @@ const Tools: React.FC = () => {
 }`
 
   const doVector = async (v:any) => {
-    const r = await api.post('/api/v1/acrac/tools/vector/search', v)
-    setVsOut(r.data)
-    const arr = (r.data.scenarios||[]).map((s:any)=> ({ semantic_id: s.semantic_id, description_zh: s.description_zh, panel_name: s.panel_name, topic_name: s.topic_name, similarity: s.similarity }))
+    const payload = { query: v.query, top_k: v.top_k }
+    const r = await api.post('/api/v1/acrac/rag-services/search-scenarios-by-text', payload)
+    setVsOut({ scenarios: r.data })
+    const arr = (Array.isArray(r.data) ? r.data : []).map((s:any)=> ({ semantic_id: s.semantic_id, description_zh: s.description_zh, panel_name: s.panel_name, topic_name: s.topic_name, similarity: s.similarity_score || s.similarity }))
     setScenariosJson(JSON.stringify(arr, null, 2))
   }
 
   const doRerank = async (v:any) => {
     try {
       const scenarios = JSON.parse(scenariosJson || '[]')
-      const r = await api.post('/api/v1/acrac/tools/rerank', { query: v.query, scenarios })
+      const r = await api.post('/api/v1/acrac/rag-services/rerank', { query: v.query, scenarios })
       setVrOut(r.data)
     } catch (e:any) {
       setVrOut(null)
@@ -67,7 +68,7 @@ const Tools: React.FC = () => {
   }
 
   const doParse = async () => {
-    const r = await api.post('/api/v1/acrac/tools/llm/parse', { llm_raw: parseText })
+    const r = await api.post('/api/v1/acrac/rag-services/parse', { llm_response: parseText })
     setParseOut(r.data)
   }
 
@@ -101,7 +102,7 @@ const Tools: React.FC = () => {
           payload.contexts = trimmed.split('\n').map(s=>s.trim()).filter(Boolean)
         }
       }
-      const r = await api.post('/api/v1/acrac/tools/ragas/score', payload)
+      const r = await api.post('/api/v1/acrac/rag-services/ragas', payload)
       setRagasOut(r.data)
     } catch (e: any) {
       message.error('RAGAS评测失败: ' + (e?.response?.data?.detail || e.message))
@@ -110,7 +111,7 @@ const Tools: React.FC = () => {
 
   const loadRagasSchema = async () => {
     try {
-      const r = await api.get('/api/v1/acrac/tools/ragas/schema')
+      const r = await api.get('/api/v1/acrac/rag-services/ragas/schema')
       setRagasSchema(r.data)
     } catch (e: any) {
       message.error('获取RAGAS方案失败: ' + (e?.response?.data?.detail || e.message))

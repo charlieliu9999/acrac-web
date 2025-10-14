@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
-from app.services.rag_llm_recommendation_service import rag_llm_service, embed_with_siliconflow
+import app.services.rag_llm_recommendation_service as rag_mod
+from app.services.rag_llm_recommendation_service import embed_with_siliconflow
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ class RerankResponse(BaseModel):
 @router.post('/rerank', response_model=RerankResponse, summary='对场景列表进行重排')
 async def rerank_scenarios(req: RerankRequest):
     try:
-        svc = rag_llm_service
+        svc = rag_mod.rag_llm_service
         scenarios = [s.model_dump() for s in req.scenarios]
         # Best-effort infer targets
         try:
@@ -61,7 +62,7 @@ class LLMParseResponse(BaseModel):
 @router.post('/llm/parse', response_model=LLMParseResponse, summary='解析LLM原始输出为结构化')
 async def llm_parse(req: LLMParseRequest):
     try:
-        parsed = rag_llm_service.parse_llm_response(req.llm_raw)
+        parsed = rag_mod.rag_llm_service.parse_llm_response(req.llm_raw)
         return LLMParseResponse(parsed=parsed)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -81,9 +82,9 @@ class RagasResponse(BaseModel):
 @router.post('/ragas/score', response_model=RagasResponse, summary='计算RAGAS指标（需配置，可能耗时）')
 async def ragas_score(req: RagasRequest):
     try:
-        if not hasattr(rag_llm_service, '_compute_ragas_scores'):
+        if not hasattr(rag_mod.rag_llm_service, '_compute_ragas_scores'):
             raise HTTPException(status_code=400, detail='RAGAS未配置')
-        scores = rag_llm_service._compute_ragas_scores(
+        scores = rag_mod.rag_llm_service._compute_ragas_scores(
             user_input=req.user_input,
             answer=req.answer,
             contexts=req.contexts,
@@ -124,9 +125,9 @@ class VectorSearchResponse(BaseModel):
 @router.post('/vector/search', response_model=VectorSearchResponse, summary='向量检索场景TopK')
 async def vector_search(req: VectorSearchRequest):
     try:
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         qv = embed_with_siliconflow(req.query)
-        out = rag_llm_service.search_clinical_scenarios(conn, qv, top_k=req.top_k)
+        out = rag_mod.rag_llm_service.search_clinical_scenarios(conn, qv, top_k=req.top_k)
         conn.close()
         return VectorSearchResponse(scenarios=out)
     except Exception as e:

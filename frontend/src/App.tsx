@@ -9,6 +9,8 @@ import DataImport from './pages/DataImport'
 import ModelConfig from './pages/ModelConfig'
 import RAGASEvalV2 from './pages/RAGASEvalV2'
 import RunLogs from './pages/RunLogs'
+import AnalyticsDashboard from './pages/AnalyticsDashboard'
+import ProductionRecommendation from './pages/ProductionRecommendation'
 import { api } from './api/http'
 
 const { Header, Content, Sider, Footer } = Layout
@@ -26,7 +28,9 @@ function App() {
   const [statusLoading, setStatusLoading] = useState<boolean>(false)
 
   const selectedKey = React.useMemo(() => {
+    if (location.pathname.startsWith('/production')) return 'production'
     if (location.pathname.startsWith('/rules')) return 'rules'
+    if (location.pathname.startsWith('/analytics')) return 'analytics'
     if (location.pathname.startsWith('/data')) return 'data'
     if (location.pathname.startsWith('/tools')) return 'tools'
     if (location.pathname.startsWith('/import')) return 'import'
@@ -110,7 +114,9 @@ function App() {
           selectedKeys={[selectedKey]}
           onClick={(e) => {
             if (e.key === 'assistant') navigate('/')
+            if (e.key === 'production') navigate('/production')
             if (e.key === 'rules') navigate('/rules')
+            if (e.key === 'analytics') navigate('/analytics')
             if (e.key === 'data') navigate('/data')
             if (e.key === 'tools') navigate('/tools')
             if (e.key === 'import') navigate('/import')
@@ -120,9 +126,11 @@ function App() {
           }}
           items={[
             { key: 'assistant', label: 'RAG 助手' },
+            { key: 'production', label: '生产推荐' },
             { key: 'evaluation', label: 'RAG 评测' },
             { key: 'rules', label: '规则管理' },
             { key: 'data', label: '数据浏览' },
+            { key: 'analytics', label: '数据关系看板' },
             { key: 'tools', label: '工具箱' },
             { key: 'import', label: '数据导入' },
             { key: 'models', label: '模型配置' },
@@ -145,9 +153,11 @@ function App() {
           <div style={{ padding: 16, minHeight: 360, background: colorBgContainer }}>
             <Routes>
               <Route path="/" element={<RAGAssistant />} />
+              <Route path="/production" element={<ProductionRecommendation />} />
               <Route path="/evaluation" element={<RAGASEvalV2 />} />
               <Route path="/rules" element={<RulesManager />} />
               <Route path="/data" element={<DataBrowser />} />
+              <Route path="/analytics" element={<AnalyticsDashboard />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/import" element={<DataImport />} />
               <Route path="/models" element={<ModelConfig />} />

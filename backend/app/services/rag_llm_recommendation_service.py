@@ -1982,11 +1982,15 @@ print(json.dumps(out))
         if self.use_reranker:
             if provider == "siliconflow":
                 try:
+                    # 若传入的 base_url 指向本地 Ollama，则忽略以便使用环境变量中的 SiliconFlow Base URL
+                    eff_base_url = reranker_base_url
+                    if eff_base_url and (("11434" in eff_base_url) or ("ollama" in eff_base_url.lower())):
+                        eff_base_url = None
                     reranked = self._siliconflow_rerank_scenarios(
                         query,
                         scenarios,
                         scenarios_with_recs,
-                        base_url=reranker_base_url,
+                        base_url=eff_base_url,
                         model_id=reranker_model,
                     )
                     if reranked:

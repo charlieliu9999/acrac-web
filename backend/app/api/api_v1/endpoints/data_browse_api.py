@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import math
 
-from app.services.rag_llm_recommendation_service import rag_llm_service
+import app.services.rag_llm_recommendation_service as rag_mod
 
 router = APIRouter()
 
@@ -25,7 +25,7 @@ def _page_params(page: int, size: int):
 @router.get('/panels', summary='科室列表')
 async def list_panels(active_only: bool = True) -> List[Dict[str, Any]]:
     try:
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             where = "WHERE p.is_active = true" if active_only else ""
             cur.execute(
@@ -49,7 +49,7 @@ async def list_panels(active_only: bool = True) -> List[Dict[str, Any]]:
 @router.get('/topics/by-panel', summary='某科室下的主题列表')
 async def list_topics_by_panel(panel_id: str) -> List[Dict[str, Any]]:
     try:
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -73,7 +73,7 @@ async def list_topics_by_panel(panel_id: str) -> List[Dict[str, Any]]:
 @router.get('/scenarios/by-topic', summary='某主题下的临床场景列表')
 async def list_scenarios_by_topic(topic_id: str) -> List[Dict[str, Any]]:
     try:
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -101,7 +101,7 @@ async def list_scenarios_by_topic(topic_id: str) -> List[Dict[str, Any]]:
 async def list_scenarios(q: Optional[str] = Query(None), page: int = 1, size: int = 20):
     try:
         page, size = _page_params(page, size)
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             where = "WHERE cs.is_active = true"
             args: List[Any] = []
@@ -137,7 +137,7 @@ async def list_scenarios(q: Optional[str] = Query(None), page: int = 1, size: in
 async def list_procedures(q: Optional[str] = Query(None), page: int = 1, size: int = 20):
     try:
         page, size = _page_params(page, size)
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             where = "WHERE pd.is_active = true"
             args: List[Any] = []
@@ -168,7 +168,7 @@ async def list_procedures(q: Optional[str] = Query(None), page: int = 1, size: i
 async def list_recommendations(scenario_id: Optional[str] = None, q: Optional[str] = Query(None), page: int = 1, size: int = 20):
     try:
         page, size = _page_params(page, size)
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         with conn.cursor() as cur:
             where = "WHERE cr.is_active = true"
             args: List[Any] = []

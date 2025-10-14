@@ -37,7 +37,7 @@
       "kind": "llm",
       "model": "gpt-oss:20b",
       "base_url": "http://host.docker.internal:11434/v1",
-      "api_key": "nokey",
+      "api_key": null,
       "api_key_env": "nokey"
     },
     {
@@ -47,7 +47,7 @@
       "kind": "llm",
       "model": "Qwen/Qwen2.5-7B-Instruct",
       "base_url": "https://api.siliconflow.cn/v1",
-      "api_key": "",
+      "api_key": null,
       "api_key_env": "sk-ybghruztazvtitpwrityokshmckxkwflviwpuvseqopmxfze"
     }
   ],
@@ -79,7 +79,7 @@
       "kind": "embedding",
       "model": "qwen3-embed-4b:latest",
       "base_url": "http://host.docker.internal:11434/v1",
-      "api_key": "",
+      "api_key": null,
       "api_key_env": "nokey"
     }
   ],
@@ -101,7 +101,7 @@
       "kind": "reranker",
       "model": "BAAI/bge-reranker-v2-m3",
       "base_url": "https://api.siliconflow.cn/v1/rerank",
-      "api_key": "sk-ybghruztazvtitpwrityokshmckxkwflviwpuvseqopmxfze",
+      "api_key": null,
       "api_key_env": "sk-ybghruztazvtitpwrityokshmckxkwflviwpuvseqopmxfze"
     }
   ]

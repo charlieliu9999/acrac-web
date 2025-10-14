@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from app.core.config import settings
 
-from app.services.rag_llm_recommendation_service import rag_llm_service
+import app.services.rag_llm_recommendation_service as rag_mod
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
         logger.info(f"收到智能推荐请求: {request.clinical_query}")
 
         # 调用RAG+LLM服务（支持可配置参数）
-        result = rag_llm_service.generate_intelligent_recommendation(
+        result = rag_mod.rag_llm_service.generate_intelligent_recommendation(
             query=request.clinical_query,
             top_scenarios=request.top_scenarios,
             top_recommendations_per_scenario=request.top_recommendations_per_scenario,
@@ -139,7 +139,7 @@ async def get_intelligent_recommendation(request: IntelligentRecommendationReque
 @router.post("/rules-config", summary="配置规则引擎开关")
 async def update_rules_config(req: RulesConfigRequest) -> RulesConfigResponse:
     try:
-        eng = getattr(rag_llm_service, 'rules_engine', None)
+        eng = getattr(rag_mod.rag_llm_service, 'rules_engine', None)
         if not eng:
             raise HTTPException(status_code=500, detail="规则引擎未初始化")
         eng.enabled = bool(req.enabled)
@@ -154,7 +154,7 @@ async def update_rules_config(req: RulesConfigRequest) -> RulesConfigResponse:
 
 @router.get("/rules-config", summary="查看规则引擎状态")
 async def get_rules_config() -> RulesConfigResponse:
-    eng = getattr(rag_llm_service, 'rules_engine', None)
+    eng = getattr(rag_mod.rag_llm_service, 'rules_engine', None)
     if not eng:
         raise HTTPException(status_code=500, detail="规则引擎未初始化")
     packs = getattr(eng, 'packs', []) or []
@@ -164,7 +164,7 @@ async def get_rules_config() -> RulesConfigResponse:
 @router.get("/rules-packs", summary="获取当前规则包内容")
 async def get_rules_packs() -> RulesPacksResponse:
     try:
-        eng = getattr(rag_llm_service, 'rules_engine', None)
+        eng = getattr(rag_mod.rag_llm_service, 'rules_engine', None)
         if not eng:
             raise HTTPException(status_code=500, detail="规则引擎未初始化")
         cfg_path = Path(settings.RULES_CONFIG_PATH)
@@ -182,7 +182,7 @@ async def get_rules_packs() -> RulesPacksResponse:
 @router.post("/rules-packs", summary="覆盖并重载规则包（谨慎）")
 async def set_rules_packs(req: RulesPacksRequest) -> RulesPacksResponse:
     try:
-        eng = getattr(rag_llm_service, 'rules_engine', None)
+        eng = getattr(rag_mod.rag_llm_service, 'rules_engine', None)
         if not eng:
             raise HTTPException(status_code=500, detail="规则引擎未初始化")
         cfg_path = Path(settings.RULES_CONFIG_PATH)
@@ -194,10 +194,10 @@ async def set_rules_packs(req: RulesPacksRequest) -> RulesPacksResponse:
         cfg_path.write_text(json.dumps(req.content, ensure_ascii=False, indent=2), encoding='utf-8')
         # 热重载
         from app.services.rules_engine import RulesEngine
-        rag_llm_service.rules_engine = RulesEngine.from_file(cfg_path)
+        rag_mod.rag_llm_service.rules_engine = RulesEngine.from_file(cfg_path)
         # 保持原 enabled/audit_only 状态
-        rag_llm_service.rules_engine.enabled = eng.enabled
-        rag_llm_service.rules_engine.audit_only = eng.audit_only
+        rag_mod.rag_llm_service.rules_engine.enabled = eng.enabled
+        rag_mod.rag_llm_service.rules_engine.audit_only = eng.audit_only
         return RulesPacksResponse(content=req.content)
     except HTTPException:
         raise
@@ -225,7 +225,7 @@ class RulesSimulateResponse(BaseModel):
 @router.post("/rules-simulate", summary="规则试运行（不触发检索/LLM）", response_model=RulesSimulateResponse)
 async def rules_simulate(req: RulesSimulateRequest) -> RulesSimulateResponse:
     try:
-        eng = getattr(rag_llm_service, 'rules_engine', None)
+        eng = getattr(rag_mod.rag_llm_service, 'rules_engine', None)
         if not eng:
             from app.services.rules_engine import load_engine
             eng = load_engine()
@@ -236,7 +236,7 @@ async def rules_simulate(req: RulesSimulateRequest) -> RulesSimulateResponse:
             if req.stage == 'rerank':
                 ctx = {
                     "query": req.query or '',
-                    "query_signals": rag_llm_service._extract_query_signals(req.query or ''),
+                    "query_signals": rag_mod.rag_llm_service._extract_query_signals(req.query or ''),
                 }
                 scenarios = req.scenarios or []
                 res = eng.apply_rerank(ctx, scenarios)
@@ -247,7 +247,7 @@ async def rules_simulate(req: RulesSimulateRequest) -> RulesSimulateResponse:
             else:
                 ctx = {
                     "query": req.query or '',
-                    "query_signals": rag_llm_service._extract_query_signals(req.query or ''),
+                    "query_signals": rag_mod.rag_llm_service._extract_query_signals(req.query or ''),
                     "scenarios": req.scenarios or []
                 }
                 parsed = req.llm_parsed or {}
@@ -299,7 +299,7 @@ async def check_rag_llm_status():
     """检查RAG+LLM服务状态"""
     try:
         # 尝试连接数据库
-        conn = rag_llm_service.connect_db()
+        conn = rag_mod.rag_llm_service.connect_db()
         if conn:
             try:
                 conn.close()
@@ -307,7 +307,7 @@ async def check_rag_llm_status():
                 pass
 
         # LLM 健康
-        test_response = rag_llm_service.call_llm("简单测试: 1+1=?")
+        test_response = rag_mod.rag_llm_service.call_llm("简单测试: 1+1=?")
         llm_available = bool(test_response and len(test_response) > 0)
 
         # Embedding 健康（尝试请求真实向量）

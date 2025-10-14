@@ -8,6 +8,7 @@ import os
 import re
 import json
 from app.core.config import settings
+import app.services.rag_llm_recommendation_service as rag_mod
 
 router = APIRouter()
 
@@ -211,6 +212,81 @@ async def validate_data() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class TestProviderRequest(BaseModel):
+    provider: str = Field(..., description='提供商标识：siliconflow | openai | qwen | ollama')
+    config: Dict[str, Any] = Field(default_factory=dict, description='连接配置，例如 base_url/api_key/model 等')
+
+
+@router.post('/models/test-provider', summary='测试模型提供商连通性')
+async def test_provider(req: TestProviderRequest) -> Dict[str, Any]:
+    """轻量连通性测试，用于前端快速校验配置是否合理。
+
+    设计目标：
+    - 不依赖系统全局上下文，不持久化任何信息；
+    - 优先做轻量 HTTP 探测；
+    - 可选做一次极简 LLM/Embedding ping（若配置充分且可用）。
+    """
+    import requests  # type: ignore
+    provider = (req.provider or '').lower().strip()
+    cfg = dict(req.config or {})
+    base_url = (cfg.get('base_url') or cfg.get('url') or cfg.get('endpoint') or '').strip()
+    api_key = (cfg.get('api_key') or os.getenv('SILICONFLOW_API_KEY') or '').strip()
+    llm_model = (cfg.get('llm_model') or cfg.get('model') or os.getenv('SILICONFLOW_LLM_MODEL') or '').strip()
+    emb_model = (cfg.get('embedding_model') or os.getenv('SILICONFLOW_EMBEDDING_MODEL') or '').strip()
+
+    out: Dict[str, Any] = {
+        'success': False,
+        'provider': provider,
+        'base_url': base_url,
+    }
+
+    # 1) 轻量 HTTP 探测（HEAD/GET 根路径）
+    try:
+        if base_url:
+            url = base_url.rstrip('/')
+            try:
+                r = requests.head(url, timeout=5)
+                out['probe'] = {'method': 'HEAD', 'status': r.status_code}
+            except Exception:
+                r = requests.get(url, timeout=5)
+                out['probe'] = {'method': 'GET', 'status': r.status_code}
+            if r.status_code >= 200 and r.status_code < 500:
+                out['reachable'] = True
+            else:
+                out['reachable'] = False
+        else:
+            out['probe'] = {'warning': 'no base_url provided'}
+    except Exception as e:
+        out['reachable'] = False
+        out['error'] = f'probe failed: {e}'
+
+    # 2) 可选极简 ping（OpenAI 兼容协议：用于 siliconflow/openai/qwen 或本地 ollama v1）
+    try:
+        # 仅在提供 model 且 base_url 存在时尝试；
+        if llm_model and base_url and provider in {'siliconflow', 'openai', 'qwen', 'ollama'}:
+            import openai  # type: ignore
+            client = openai.OpenAI(api_key=(api_key or ('ollama' if '11434' in base_url or 'ollama' in base_url.lower() else api_key)), base_url=base_url)
+            resp = client.chat.completions.create(
+                model=llm_model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=4,
+                temperature=0
+            )
+            ok = bool(resp.choices and resp.choices[0].message)
+            out['llm_ping'] = {'status': 'ok' if ok else 'warning'}
+            if ok:
+                out['success'] = True
+    except Exception as e:
+        out['llm_ping'] = {'status': 'error', 'error': str(e)}
+
+    # 3) 若未能做 LLM ping，但基础连通性存在，即认为“基本可用”
+    if not out.get('success'):
+        if out.get('reachable'):
+            out['success'] = True
+
+    return out
+
+
 @router.post('/upload', summary='上传CSV文件')
 async def upload_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
     try:
@@ -233,6 +309,78 @@ async def upload_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
         return { 'ok': True, 'path': str(dest) }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get('/models/audit', summary='模型配置一致性检查（配置 vs 运行时）')
+async def models_audit() -> Dict[str, Any]:
+    """比较以下三部分：
+    1) 存储的 contexts（config/model_contexts.json）
+    2) RAG 运行时（rag_llm_service 当前使用）
+    3) RAGAS 评测运行时（ACRACRAGASEvaluator 默认）
+
+    返回每部分的有效值与差异汇总，帮助定位“页面配置已保存但服务未生效”的情况。
+    """
+    try:
+        cfg = _load_contexts_payload()  # {'contexts': {inference, evaluation}, ...}
+        contexts = cfg.get('contexts') or {}
+        inf_cfg = contexts.get('inference') or {}
+        eva_cfg = contexts.get('evaluation') or {}
+
+        # RAG 运行时（服务当前持有）
+        rag_rt = {
+            'llm_model': getattr(rag_mod.rag_llm_service, 'llm_model', None),
+            'embedding_model': getattr(rag_mod.rag_llm_service, 'embedding_model', None),
+            'reranker_model': getattr(rag_mod.rag_llm_service, 'reranker_model', None),
+            'base_url': getattr(rag_mod.rag_llm_service, 'base_url', None),
+            'max_tokens': getattr(rag_mod.rag_llm_service, 'max_tokens', None),
+            'force_json_output': getattr(rag_mod.rag_llm_service, 'force_json_output', None),
+        }
+
+        # RAGAS 运行时（严格使用配置文件中的 evaluation 上下文）
+        try:
+            eva_ctx = getattr(getattr(rag_mod.rag_llm_service, 'contexts', {}), 'default_evaluation_context', {}) or {}
+            ragas_rt = {
+                'llm_model': eva_ctx.get('llm_model'),
+                'embedding_model': eva_ctx.get('embedding_model'),
+                'base_url': eva_ctx.get('base_url'),
+            }
+        except Exception as e:
+            ragas_rt = {'error': f'eval_context_unavailable: {e}'}
+
+        def _diff(a: Dict[str, Any], b: Dict[str, Any], keys: list[str]):
+            d = {}
+            for k in keys:
+                if (a.get(k) or '') != (b.get(k) or ''):
+                    d[k] = {'config': a.get(k), 'runtime': b.get(k)}
+            return d
+
+        # 比较：inference
+        inf_keys = ['llm_model', 'embedding_model', 'reranker_model', 'base_url']
+        inf_diff = _diff(inf_cfg, rag_rt, inf_keys)
+        # 比较：evaluation（不含 reranker）
+        eva_keys = ['llm_model', 'embedding_model', 'base_url']
+        eva_diff = _diff(eva_cfg, ragas_rt if 'error' not in ragas_rt else {}, eva_keys)
+
+        return {
+            'config': {
+                'inference': inf_cfg,
+                'evaluation': eva_cfg,
+            },
+            'runtime': {
+                'rag': rag_rt,
+                'ragas': ragas_rt,
+            },
+            'match': {
+                'inference': len(inf_diff) == 0,
+                'evaluation': len(eva_diff) == 0,
+            },
+            'diff': {
+                'inference': inf_diff,
+                'evaluation': eva_diff,
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'audit failed: {e}')
 
 
 @router.post('/import', response_model=ImportResponse, summary='从CSV导入/重建数据（同步执行，可能耗时）')

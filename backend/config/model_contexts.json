@@ -1,17 +1,16 @@
 {
   "contexts": {
     "inference": {
-      "llm_model": "qwen2.5:32b",
-      "embedding_model": "bge-m3:latest",
+      "llm_model": "Qwen/Qwen3-32B",
+      "embedding_model": "BAAI/bge-m3",
       "reranker_model": "BAAI/bge-reranker-v2-m3",
-      "base_url": "http://host.docker.internal:11434/v1",
+      "base_url": "https://api.siliconflow.cn/v1",
       "temperature": 0.1,
       "top_p": 0.7
     },
     "evaluation": {
-      "llm_model": "qwen2.5:32b",
-      "embedding_model": "bge-m3:latest",
-      "base_url": "https://api.siliconflow.cn/v1"
+      "llm_model": "Qwen/Qwen3-32B",
+      "embedding_model": "BAAI/bge-m3"
     }
   },
   "scenario_overrides": []

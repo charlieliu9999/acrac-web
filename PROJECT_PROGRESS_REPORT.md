@@ -9,6 +9,15 @@
 
 ---
 
+## 🔄 最新更新（2025-02）
+
+- 引入轻量级生产推荐 API（向量召回 + 去调试输出），新增批量文件上传能力
+- 前端新增「生产推荐」页面，覆盖实时调用与批量结果展示
+- 清理历史 RAG/RAGAS 调试日志与冗余目录，补充 `DIRECTORY_STRUCTURE.md` 与 `docs/PRODUCTION_RECOMMENDATION_API.md`
+- 更新进展追踪文档 `PROJECT_PROGRESS_LOG.md`，记录 2025 年后续迭代
+
+---
+
 ## 1. ✅ 已完成工作
 
 ### 1.1 核心功能模块

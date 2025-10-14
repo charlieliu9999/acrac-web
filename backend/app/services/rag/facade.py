@@ -55,7 +55,8 @@ class RAGLLMRecommendationService:
         # Models
         self.api_key = os.getenv("SILICONFLOW_API_KEY") or getattr(settings, "SILICONFLOW_API_KEY", "")
         self.default_base_url = os.getenv("SILICONFLOW_BASE_URL") or getattr(settings, "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
-        config_dir = Path(__file__).resolve().parents[2] / "config"
+        # Use backend/config as the config directory. From app/services/rag/*.py, parents[3] points to backend/
+        config_dir = Path(__file__).resolve().parents[3] / "config"
         self.contexts = Contexts(config_dir)
         self.llm_model = self.contexts.default_inference_context.get("llm_model") or os.getenv("SILICONFLOW_LLM_MODEL", "Qwen/Qwen2.5-32B-Instruct")
         self.embedding_model = self.contexts.default_inference_context.get("embedding_model") or os.getenv("SILICONFLOW_EMBEDDING_MODEL", "BAAI/bge-m3")
@@ -69,7 +70,10 @@ class RAGLLMRecommendationService:
         self.use_reranker = os.getenv("RAG_USE_RERANKER", "true").lower() == "true"
         self.rerank_provider = (os.getenv("RERANK_PROVIDER", "auto") or "auto").lower()
         self.procedure_candidate_topk = int(os.getenv("PROCEDURE_CANDIDATE_TOPK", "8"))
-        self.keyword_config_path = os.getenv("RAG_KEYWORD_CONFIG_PATH", str(Path(__file__).resolve().parents[2] / "config" / "rag_keywords.json"))
+        self.keyword_config_path = os.getenv(
+            "RAG_KEYWORD_CONFIG_PATH",
+            str(Path(__file__).resolve().parents[3] / "config" / "rag_keywords.json"),
+        )
         self.keyword_config = self._load_keyword_config()
         self.panel_boost = float(os.getenv("RAG_PANEL_BOOST", "0.10"))
         self.topic_boost = float(os.getenv("RAG_TOPIC_BOOST", "0.20"))
