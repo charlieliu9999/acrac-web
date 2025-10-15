@@ -22,6 +22,7 @@ ACRAC (American College of Radiology Appropriateness Criteria) 是一款基于�
 - **⚡ 极速响应**: 毫秒级智能推荐，实时辅助临床决策
 - **🏥 循证医学**: 100%基于ACR标准，确保推荐的科学性和权威性
 - **🔍 智能语义**: 支持自然语言输入，AI深度理解临床描述
+- **📈 质量评测**: 集成RAGAS评测框架，量化推荐质量，持续优化效果
 
 ### 目标用户
 
@@ -253,10 +254,23 @@ ACRAC (American College of Radiology Appropriateness Criteria) 是一款基于�
 
 #### RAGAS评测框架
 
-- 集成RAGAS评测指标：faithfulness、answer_relevancy、context_precision、context_recall
-- 支持批量评测和单次评测两种模式
-- 评测结果可视化展示，便于质量分析
-- 支持自定义评测标准和基准数据
+- **四大核心指标**：
+  - `faithfulness`：答案与检索内容的忠实度，确保推荐基于真实医学证据
+  - `answer_relevancy`：答案与用户查询的相关性，保证推荐精准匹配临床需求
+  - `context_precision`：检索内容的精确度，评估召回场景的质量
+  - `context_recall`：检索内容的召回率，确保不遗漏重要医学信息
+
+- **评测模式**：
+  - 单次评测：实时评估单个推荐的质量
+  - 批量评测：支持Excel文件批量导入，大规模质量评估
+  - 对比评测：A/B测试不同推荐策略的效果
+  - 持续评测：定期评估系统推荐质量变化趋势
+
+- **评测结果分析**：
+  - 可视化评分展示，直观了解推荐质量
+  - 详细评测报告，包含各项指标得分和问题分析
+  - 历史评测数据对比，跟踪质量改进效果
+  - 支持导出评测报告，便于质量管理和汇报
 
 #### 规则引擎
 
@@ -367,6 +381,13 @@ ACRAC (American College of Radiology Appropriateness Criteria) 是一款基于�
 - 研究不同人群的检查偏好
 - 支持公共卫生政策制定
 - 提供大规模数据分析能力
+
+#### 质量评测研究
+
+- 使用RAGAS框架量化推荐质量
+- 对比不同推荐算法的效果差异
+- 评估系统改进对推荐质量的影响
+- 支持医疗AI质量标准的建立和验证
 
 ### 医院管理应用
 
@@ -642,6 +663,13 @@ ACRAC (American College of Radiology Appropriateness Criteria) 是一款基于�
 - 向量总数: 19,042个
 - 向量覆盖率: 100%
 - 索引类型: IVFFLAT (PostgreSQL)
+
+#### 评测能力
+
+- RAGAS评测指标: 4项核心指标
+- 批量评测支持: 1000+样本/批次
+- 评测响应时间: <5秒/样本
+- 评测结果存储: 支持历史数据对比分析
 
 ### 安全合规
 
